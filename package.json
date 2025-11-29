@@ -1,0 +1,16 @@
+{
+  "name": "crypto-analyzer",
+  "version": "1.0.0",
+  "description": "Analisador profissional de protocolos DeFi e tokens",
+  "type": "module",
+  "main": "crypto-analyzer.js",
+  "scripts": {
+    "start": "node crypto-analyzer.js"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "ora": "^9.0.0"
+  }
+}
