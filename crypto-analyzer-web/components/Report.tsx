@@ -35,21 +35,25 @@ export default function Report({ report }: ReportProps) {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in">
+    <div className="w-full max-w-7xl mx-auto space-y-8 animate-fade-in mt-12">
       {/* Header */}
-      <div className="bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl p-6 text-center">
-        <h1 className="text-3xl font-bold mb-2">{data.name}</h1>
-        <p className="text-xl opacity-90">
-          {data.symbol} • {data.category}
-        </p>
-        <p className="text-sm mt-2 opacity-75">
-          Análise gerada em {new Date().toLocaleString('pt-BR')}
-        </p>
+      <div className="text-center space-y-4 pb-8 border-b border-slate-700/50">
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight">{data.name}</h1>
+        <div className="flex items-center justify-center gap-3 text-lg text-slate-400">
+          <span className="font-mono font-semibold text-cyan-400">{data.symbol}</span>
+          <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+          <span>{data.category}</span>
+        </div>
+        {data.price && (
+          <div className="text-3xl font-bold text-green-400">
+            {formatNumber(data.price)}
+          </div>
+        )}
       </div>
 
       {/* Informações Básicas */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-xl font-bold mb-4 text-cyan-400">📊 Informações Básicas</h2>
+      <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/30">
+        <h2 className="text-2xl font-bold mb-6 text-white">Informações Básicas</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
             <span className="text-slate-300">Nome</span>
@@ -71,8 +75,8 @@ export default function Report({ report }: ReportProps) {
       </div>
 
       {/* Métricas de Mercado */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-xl font-bold mb-4 text-cyan-400">💰 Métricas de Mercado</h2>
+      <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/30">
+        <h2 className="text-2xl font-bold mb-6 text-white">Métricas de Mercado</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {data.marketCap && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
@@ -106,8 +110,8 @@ export default function Report({ report }: ReportProps) {
 
       {/* Supply Analysis */}
       {(data.circulating || data.total || data.max) && (
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-bold mb-4 text-cyan-400">📦 Análise de Supply</h2>
+        <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/30">
+          <h2 className="text-2xl font-bold mb-6 text-white">Análise de Supply</h2>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -159,8 +163,8 @@ export default function Report({ report }: ReportProps) {
       )}
 
       {/* Variações */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-xl font-bold mb-4 text-cyan-400">📈 Variações (Performance)</h2>
+      <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/30">
+        <h2 className="text-2xl font-bold mb-6 text-white">Variações (Performance)</h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -205,8 +209,8 @@ export default function Report({ report }: ReportProps) {
 
       {/* Distribuição por Chain */}
       {data.chains && Object.keys(data.chains).length > 0 && (
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-bold mb-4 text-cyan-400">🔗 Distribuição de TVL por Blockchain</h2>
+        <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/30">
+          <h2 className="text-2xl font-bold mb-6 text-white">Distribuição de TVL por Blockchain</h2>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -238,8 +242,8 @@ export default function Report({ report }: ReportProps) {
       )}
 
       {/* Ratios */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-xl font-bold mb-4 text-cyan-400">🧮 Ratios e Métricas Avançadas</h2>
+      <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/30">
+        <h2 className="text-2xl font-bold mb-6 text-white">Ratios e Métricas Avançadas</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {data.fdv && data.marketCap && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
@@ -315,8 +319,8 @@ export default function Report({ report }: ReportProps) {
       </div>
 
       {/* Score de Risco */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-8 border-2 border-cyan-500">
-        <h2 className="text-2xl font-bold mb-6 text-center text-cyan-400">⭐ SCORE DE RISCO GERAL</h2>
+      <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl p-8 border border-cyan-500/30">
+        <h2 className="text-2xl font-bold mb-8 text-center text-white">Score de Risco</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
@@ -343,16 +347,15 @@ export default function Report({ report }: ReportProps) {
             </p>
           </div>
         </div>
-        <div className="mt-6 p-4 bg-slate-700/50 rounded-lg">
-          <h3 className="font-bold mb-2 text-cyan-400">💡 Recomendação</h3>
-          <p className="text-slate-200">{riskScore.recommendation}</p>
+        <div className="mt-6 p-6 bg-slate-700/30 rounded-xl border border-slate-600/30">
+          <h3 className="font-bold mb-3 text-white text-lg">Recomendação</h3>
+          <p className="text-slate-300 leading-relaxed">{riskScore.recommendation}</p>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="text-center text-sm text-slate-400 py-4 border-t border-slate-700">
-        <p>Análise gerada por Crypto Analyzer - Use por sua conta e risco</p>
-        <p className="mt-1">Sempre faça sua própria pesquisa (DYOR) antes de investir</p>
+      <div className="text-center text-xs text-slate-500 py-8 mt-12">
+        <p>Análise gerada por Crypto Analyzer • DYOR (Do Your Own Research)</p>
       </div>
     </div>
   );

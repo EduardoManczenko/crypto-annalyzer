@@ -34,26 +34,14 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 py-12 px-4">
-      <div className="container mx-auto">
+      <div className="container mx-auto px-4">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-block mb-4">
-            <div className="bg-gradient-to-r from-cyan-500 to-blue-500 p-4 rounded-2xl">
-              <h1 className="text-4xl md:text-5xl font-bold">
-                🔍 Crypto Analyzer
-              </h1>
-            </div>
-          </div>
-          <p className="text-xl text-slate-300 mb-2">
-            Análise Profissional de Protocolos DeFi e Tokens
-          </p>
-          <p className="text-slate-400">
-            Obtenha métricas avançadas, análise de risco e insights valiosos
-          </p>
-        </div>
+        <div className="text-center mb-16 pt-12">
+          <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent mb-16">
+            Crypto Analyzer
+          </h1>
 
-        {/* Search Form */}
-        <div className="mb-12">
+          {/* Search Form */}
           <SearchForm onSearch={handleSearch} isLoading={isLoading} />
         </div>
 
@@ -109,36 +97,9 @@ export default function Home() {
 
         {/* Empty State */}
         {!report && !isLoading && !error && (
-          <div className="max-w-4xl mx-auto text-center py-20">
-            <div className="text-6xl mb-6">📊</div>
-            <h2 className="text-2xl font-bold text-slate-300 mb-4">
-              Pronto para Analisar
-            </h2>
-            <p className="text-slate-400 mb-8">
-              Digite o nome de uma criptomoeda ou protocolo DeFi acima para começar a análise completa
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-                <div className="text-3xl mb-3">📈</div>
-                <h3 className="font-bold mb-2 text-cyan-400">Métricas Avançadas</h3>
-                <p className="text-sm text-slate-400">
-                  Market Cap, FDV, Volume, TVL e muito mais
-                </p>
-              </div>
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-                <div className="text-3xl mb-3">🔍</div>
-                <h3 className="font-bold mb-2 text-cyan-400">Análise de Risco</h3>
-                <p className="text-sm text-slate-400">
-                  Identificação automática de red flags e pontos positivos
-                </p>
-              </div>
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-                <div className="text-3xl mb-3">⭐</div>
-                <h3 className="font-bold mb-2 text-cyan-400">Score Inteligente</h3>
-                <p className="text-sm text-slate-400">
-                  Classificação de risco de 0 a 100 com recomendações
-                </p>
-              </div>
+          <div className="max-w-2xl mx-auto text-center py-32">
+            <div className="text-slate-500 text-sm">
+              Digite uma criptomoeda ou protocolo para começar
             </div>
           </div>
         )}
