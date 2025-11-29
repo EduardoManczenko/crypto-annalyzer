@@ -22,6 +22,18 @@ export default function Report({ report }: ReportProps) {
     return 'text-red-400';
   };
 
+  // Função helper para formatar porcentagens com segurança
+  const safeToFixed = (value: number | null | undefined, decimals: number = 2): string => {
+    if (value === null || value === undefined || isNaN(value)) return '-';
+    return value.toFixed(decimals);
+  };
+
+  // Função helper para calcular percentual com segurança
+  const safePercent = (numerator: number | null | undefined, denominator: number | null | undefined, decimals: number = 1): string => {
+    if (!numerator || !denominator || isNaN(numerator) || isNaN(denominator) || denominator === 0) return '-';
+    return ((numerator / denominator) * 100).toFixed(decimals);
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in">
       {/* Header */}
@@ -110,14 +122,14 @@ export default function Report({ report }: ReportProps) {
                   <tr>
                     <td className="py-3 px-4">Circulating Supply</td>
                     <td className="py-3 px-4 text-right font-mono">{formatLargeNumber(data.circulating)}</td>
-                    <td className="py-3 px-4 text-right">{data.max ? `${((data.circulating / data.max) * 100).toFixed(1)}%` : '-'}</td>
+                    <td className="py-3 px-4 text-right">{safePercent(data.circulating, data.max)}%</td>
                   </tr>
                 )}
                 {data.total && (
                   <tr>
                     <td className="py-3 px-4">Total Supply</td>
                     <td className="py-3 px-4 text-right font-mono">{formatLargeNumber(data.total)}</td>
-                    <td className="py-3 px-4 text-right">{data.max ? `${((data.total / data.max) * 100).toFixed(1)}%` : '-'}</td>
+                    <td className="py-3 px-4 text-right">{safePercent(data.total, data.max)}%</td>
                   </tr>
                 )}
                 <tr>
@@ -132,9 +144,11 @@ export default function Report({ report }: ReportProps) {
                       {formatLargeNumber(data.total - data.circulating)}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <span className={((data.total - data.circulating) / data.total * 100) > 50 ? 'text-red-400' : ((data.total - data.circulating) / data.total * 100) > 30 ? 'text-yellow-400' : 'text-green-400'}>
-                        {(((data.total - data.circulating) / data.total) * 100).toFixed(1)}%
-                      </span>
+                      {(() => {
+                        const lockedPercent = ((data.total - data.circulating) / data.total) * 100;
+                        const colorClass = lockedPercent > 50 ? 'text-red-400' : lockedPercent > 30 ? 'text-yellow-400' : 'text-green-400';
+                        return <span className={colorClass}>{safeToFixed(lockedPercent, 1)}%</span>;
+                      })()}
                     </td>
                   </tr>
                 )}
@@ -204,11 +218,11 @@ export default function Report({ report }: ReportProps) {
               </thead>
               <tbody className="divide-y divide-slate-700">
                 {Object.entries(data.chains)
-                  .sort(([, a], [, b]) => b - a)
+                  .sort(([, a], [, b]) => (b || 0) - (a || 0))
                   .slice(0, 10)
                   .map(([chain, tvl]) => {
-                    const totalTvl = Object.values(data.chains!).reduce((sum, v) => sum + v, 0);
-                    const pct = ((tvl / totalTvl) * 100).toFixed(1);
+                    const totalTvl = Object.values(data.chains!).reduce((sum, v) => sum + (v || 0), 0);
+                    const pct = safePercent(tvl, totalTvl);
                     return (
                       <tr key={chain}>
                         <td className="py-3 px-4">{chain}</td>
@@ -230,7 +244,7 @@ export default function Report({ report }: ReportProps) {
           {data.fdv && data.marketCap && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
               <p className="text-sm text-slate-400 mb-1">FDV/Market Cap</p>
-              <p className="text-xl font-bold">{(data.fdv / data.marketCap).toFixed(2)}x</p>
+              <p className="text-xl font-bold">{safeToFixed(data.fdv / data.marketCap, 2)}x</p>
               <p className={`text-sm mt-1 ${(data.fdv / data.marketCap) < 1.5 ? 'text-green-400' : (data.fdv / data.marketCap) < 3 ? 'text-yellow-400' : 'text-red-400'}`}>
                 {(data.fdv / data.marketCap) < 1.5 ? 'Ótimo' : (data.fdv / data.marketCap) < 3 ? 'Razoável' : 'Alto Risco'}
               </p>
@@ -239,7 +253,7 @@ export default function Report({ report }: ReportProps) {
           {data.marketCap && data.tvl && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
               <p className="text-sm text-slate-400 mb-1">MCap/TVL</p>
-              <p className="text-xl font-bold">{(data.marketCap / data.tvl).toFixed(2)}</p>
+              <p className="text-xl font-bold">{safeToFixed(data.marketCap / data.tvl, 2)}</p>
               <p className={`text-sm mt-1 ${(data.marketCap / data.tvl) < 0.5 ? 'text-green-400' : (data.marketCap / data.tvl) < 2 ? 'text-yellow-400' : 'text-red-400'}`}>
                 {(data.marketCap / data.tvl) < 0.5 ? 'Subvalorizado' : (data.marketCap / data.tvl) < 2 ? 'Justo' : 'Sobrevalorizado'}
               </p>
@@ -248,7 +262,7 @@ export default function Report({ report }: ReportProps) {
           {data.volume24h && data.marketCap && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
               <p className="text-sm text-slate-400 mb-1">Volume/MCap 24h</p>
-              <p className="text-xl font-bold">{((data.volume24h / data.marketCap) * 100).toFixed(2)}%</p>
+              <p className="text-xl font-bold">{safePercent(data.volume24h, data.marketCap, 2)}%</p>
               <p className={`text-sm mt-1 ${((data.volume24h / data.marketCap) * 100) < 1 ? 'text-red-400' : ((data.volume24h / data.marketCap) * 100) < 10 ? 'text-yellow-400' : 'text-green-400'}`}>
                 {((data.volume24h / data.marketCap) * 100) < 1 ? 'Liquidez Baixa' : ((data.volume24h / data.marketCap) * 100) < 10 ? 'Liquidez Média' : 'Alta Liquidez'}
               </p>
@@ -257,7 +271,7 @@ export default function Report({ report }: ReportProps) {
           {data.circulating && data.total && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
               <p className="text-sm text-slate-400 mb-1">% em Circulação</p>
-              <p className="text-xl font-bold">{((data.circulating / data.total) * 100).toFixed(1)}%</p>
+              <p className="text-xl font-bold">{safePercent(data.circulating, data.total, 1)}%</p>
               <p className={`text-sm mt-1 ${((data.circulating / data.total) * 100) > 70 ? 'text-green-400' : ((data.circulating / data.total) * 100) > 40 ? 'text-yellow-400' : 'text-red-400'}`}>
                 {((data.circulating / data.total) * 100) > 70 ? 'Boa Distribuição' : ((data.circulating / data.total) * 100) > 40 ? 'Moderada' : 'Alta Diluição'}
               </p>
