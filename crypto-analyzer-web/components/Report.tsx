@@ -54,22 +54,22 @@ export default function Report({ report }: ReportProps) {
       {/* Informações Básicas */}
       <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/30">
         <h2 className="text-2xl font-bold mb-6 text-white">Informações Básicas</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
-            <span className="text-slate-300">Nome</span>
-            <span className="font-semibold">{data.name}</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+          <div className="flex flex-col items-center p-4 bg-slate-700/50 rounded-lg">
+            <span className="text-sm text-slate-400 mb-2">Nome</span>
+            <span className="font-semibold text-lg">{data.name}</span>
           </div>
-          <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
-            <span className="text-slate-300">Símbolo</span>
-            <span className="font-semibold">{data.symbol}</span>
+          <div className="flex flex-col items-center p-4 bg-slate-700/50 rounded-lg">
+            <span className="text-sm text-slate-400 mb-2">Símbolo</span>
+            <span className="font-semibold text-lg">{data.symbol}</span>
           </div>
-          <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
-            <span className="text-slate-300">Categoria</span>
-            <span className="font-semibold">{data.category}</span>
+          <div className="flex flex-col items-center p-4 bg-slate-700/50 rounded-lg">
+            <span className="text-sm text-slate-400 mb-2">Categoria</span>
+            <span className="font-semibold text-lg">{data.category}</span>
           </div>
-          <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
-            <span className="text-slate-300">Preço Atual</span>
-            <span className="font-semibold text-green-400">{formatNumber(data.price)}</span>
+          <div className="flex flex-col items-center p-4 bg-slate-700/50 rounded-lg">
+            <span className="text-sm text-slate-400 mb-2">Preço Atual</span>
+            <span className="font-semibold text-lg text-green-400">{formatNumber(data.price)}</span>
           </div>
         </div>
       </div>
@@ -77,10 +77,10 @@ export default function Report({ report }: ReportProps) {
       {/* Métricas de Mercado */}
       <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/30">
         <h2 className="text-2xl font-bold mb-6 text-white">Métricas de Mercado</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
           {data.marketCap && (
-            <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">Market Cap</p>
+            <div className="p-4 bg-slate-700/50 rounded-lg text-center">
+              <p className="text-sm text-slate-400 mb-2">Market Cap</p>
               <p className="text-xl font-bold">{formatNumber(data.marketCap)}</p>
               <p className={`text-sm mt-1 ${getMarketCapCategory(data.marketCap).color === 'green' ? 'text-green-400' : getMarketCapCategory(data.marketCap).color === 'yellow' ? 'text-yellow-400' : 'text-red-400'}`}>
                 {getMarketCapCategory(data.marketCap).category}
@@ -88,20 +88,20 @@ export default function Report({ report }: ReportProps) {
             </div>
           )}
           {data.fdv && (
-            <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">FDV (Full Diluted)</p>
+            <div className="p-4 bg-slate-700/50 rounded-lg text-center">
+              <p className="text-sm text-slate-400 mb-2">FDV (Full Diluted)</p>
               <p className="text-xl font-bold">{formatNumber(data.fdv)}</p>
             </div>
           )}
           {data.volume24h && (
-            <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">Volume 24h</p>
+            <div className="p-4 bg-slate-700/50 rounded-lg text-center">
+              <p className="text-sm text-slate-400 mb-2">Volume 24h</p>
               <p className="text-xl font-bold">{formatNumber(data.volume24h)}</p>
             </div>
           )}
           {data.tvl && (
-            <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">TVL</p>
+            <div className="p-4 bg-slate-700/50 rounded-lg text-center">
+              <p className="text-sm text-slate-400 mb-2">TVL</p>
               <p className="text-xl font-bold text-cyan-400">{formatNumber(data.tvl)}</p>
             </div>
           )}

@@ -33,16 +33,18 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 py-12 px-4">
+    <main className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
       <div className="container mx-auto px-4">
-        {/* Header */}
-        <div className="text-center mb-16 pt-12">
-          <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent mb-16">
-            Crypto Analyzer
-          </h1>
+        {/* Header e Search - Centralizado verticalmente quando vazio */}
+        <div className={`transition-all duration-500 ${!report && !isLoading && !error ? 'min-h-screen flex flex-col items-center justify-center' : 'pt-12 pb-8'}`}>
+          <div className="text-center space-y-12">
+            <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+              Crypto Analyzer
+            </h1>
 
-          {/* Search Form */}
-          <SearchForm onSearch={handleSearch} isLoading={isLoading} />
+            {/* Search Form */}
+            <SearchForm onSearch={handleSearch} isLoading={isLoading} />
+          </div>
         </div>
 
         {/* Loading State */}
@@ -90,17 +92,8 @@ export default function Home() {
 
         {/* Report */}
         {report && !isLoading && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in pb-12">
             <Report report={report} />
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!report && !isLoading && !error && (
-          <div className="max-w-2xl mx-auto text-center py-32">
-            <div className="text-slate-500 text-sm">
-              Digite uma criptomoeda ou protocolo para começar
-            </div>
           </div>
         )}
       </div>
