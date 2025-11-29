@@ -3,6 +3,10 @@ import axios from 'axios';
 import { CryptoData, AnalysisReport } from '@/types';
 import { calculateRedFlags, calculateRiskScore } from '@/utils/analyzer';
 
+// Configure runtime (nodejs for better compatibility)
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const API_ENDPOINTS = {
   defillama: {
     protocols: 'https://api.llama.fi/protocols',
@@ -14,9 +18,19 @@ const API_ENDPOINTS = {
   }
 };
 
+// Configurar axios com timeout
+const axiosInstance = axios.create({
+  timeout: 15000, // 15 segundos
+  headers: {
+    'User-Agent': 'CryptoAnalyzer/1.0',
+  }
+});
+
 async function searchDeFiLlama(query: string) {
   try {
-    const response = await axios.get(API_ENDPOINTS.defillama.protocols);
+    const response = await axiosInstance.get(API_ENDPOINTS.defillama.protocols, {
+      timeout: 10000
+    });
     const protocols = response.data;
 
     const found = protocols.find((p: any) =>
@@ -25,21 +39,25 @@ async function searchDeFiLlama(query: string) {
     );
 
     if (found) {
-      const detailResponse = await axios.get(API_ENDPOINTS.defillama.protocol(found.slug));
+      const detailResponse = await axiosInstance.get(
+        API_ENDPOINTS.defillama.protocol(found.slug),
+        { timeout: 10000 }
+      );
       return detailResponse.data;
     }
 
     return null;
-  } catch (error) {
-    console.error('Error searching DeFiLlama:', error);
+  } catch (error: any) {
+    console.error('Error searching DeFiLlama:', error.message);
     return null;
   }
 }
 
 async function searchCoinGecko(query: string) {
   try {
-    const searchResponse = await axios.get(API_ENDPOINTS.coingecko.search, {
-      params: { query }
+    const searchResponse = await axiosInstance.get(API_ENDPOINTS.coingecko.search, {
+      params: { query },
+      timeout: 10000
     });
 
     const coin = searchResponse.data.coins[0];
@@ -47,10 +65,13 @@ async function searchCoinGecko(query: string) {
       return null;
     }
 
-    const coinResponse = await axios.get(API_ENDPOINTS.coingecko.coin(coin.id));
+    const coinResponse = await axiosInstance.get(
+      API_ENDPOINTS.coingecko.coin(coin.id),
+      { timeout: 10000 }
+    );
     return coinResponse.data;
-  } catch (error) {
-    console.error('Error searching CoinGecko:', error);
+  } catch (error: any) {
+    console.error('Error searching CoinGecko:', error.message);
     return null;
   }
 }
@@ -59,24 +80,41 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q');
 
+  // Headers CORS
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+  };
+
   if (!query) {
     return NextResponse.json(
       { error: 'Query parameter "q" is required' },
-      { status: 400 }
+      { status: 400, headers }
     );
   }
 
   try {
-    // Buscar em paralelo
-    const [defiData, coinData] = await Promise.all([
-      searchDeFiLlama(query),
-      searchCoinGecko(query)
+    console.log(`[API] Analyzing: ${query}`);
+
+    // Buscar em paralelo com timeout
+    const [defiData, coinData] = await Promise.race([
+      Promise.all([
+        searchDeFiLlama(query),
+        searchCoinGecko(query)
+      ]),
+      new Promise<[null, null]>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout')), 20000)
+      )
     ]);
+
+    console.log(`[API] Results - DeFi: ${!!defiData}, Coin: ${!!coinData}`);
 
     if (!defiData && !coinData) {
       return NextResponse.json(
         { error: 'No data found for the given query' },
-        { status: 404 }
+        { status: 404, headers }
       );
     }
 
@@ -120,12 +158,28 @@ export async function GET(request: NextRequest) {
       riskScore,
     };
 
-    return NextResponse.json(report);
-  } catch (error) {
-    console.error('Error processing request:', error);
+    console.log(`[API] Success for: ${query}`);
+    return NextResponse.json(report, { headers });
+  } catch (error: any) {
+    console.error('[API] Error processing request:', error.message || error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      {
+        error: 'Internal server error',
+        details: error.message || 'Unknown error'
+      },
+      { status: 500, headers }
     );
   }
+}
+
+// Handle OPTIONS for CORS
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
 }
