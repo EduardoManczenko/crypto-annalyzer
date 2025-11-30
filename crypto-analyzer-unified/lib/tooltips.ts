@@ -87,9 +87,14 @@ export const fieldTooltips = {
   // Advanced Metrics
   volumeMarketCapRatio: "Razão entre volume 24h e market cap. Valores >1 indicam alta atividade de trading.",
   fdv: "Fully Diluted Valuation: market cap se todos os tokens max supply estivessem em circulação.",
+  "fdvFull": "FDV (Fully Diluted Valuation): valor total do projeto se TODOS os tokens max supply estivessem em circulação agora.",
   liquidityScore: "Score de 0-100 que mede facilidade de compra/venda sem afetar muito o preço.",
   concentrationRisk: "Indica se há muitos tokens nas mãos de poucos holders (risco de dump).",
   mcapTvlRatio: "Market Cap dividido por TVL. <1 pode indicar subvalorização em protocolos DeFi.",
+  capCategory: "Classificação do tamanho do projeto: Large Cap (>$10B), Mid Cap ($1B-$10B), Small Cap ($100M-$1B), Micro Cap (<$100M).",
+  fdvMcapRatio: "FDV dividido por Market Cap. Quanto maior que 1, mais tokens ainda serão liberados (risco de diluição).",
+  volumeMcapRatio: "Volume 24h dividido por Market Cap. Mede o quão ativamente o token é negociado.",
+  circulatingPercentage: "Percentual do max supply que já está em circulação. 100% = todos tokens liberados, <50% = muita diluição futura.",
 
   // Others
   holders: "Número total de endereços únicos que possuem o token. Mais holders = mais descentralização.",

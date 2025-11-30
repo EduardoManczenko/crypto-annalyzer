@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card"
 import { CalculatorIcon } from "../icons/calculator-icon"
 import { InfoIcon } from "../info-icon"
+import { LabelWithTooltip } from "../label-with-tooltip"
 import { CryptoData } from "@/types"
 import { sectionTooltips } from "@/lib/tooltips"
 
@@ -27,12 +28,12 @@ export function AdvancedMetrics({ data }: AdvancedMetricsProps) {
     return `${((part / total) * 100).toFixed(2)}%`
   }
 
-  const metrics = {
-    "FDV/MCap": calculateMetric(data.fdv, data.marketCap, "x"),
-    "MCap/TVL": calculateMetric(data.marketCap, data.tvl, "x"),
-    "Volume/MCap": calculateMetric(data.volume24h, data.marketCap, "x"),
-    "% em Circulação": calculatePercentage(data.circulating, data.max),
-  }
+  const metrics = [
+    { label: "FDV/MCap", tooltipKey: "fdvMcapRatio" as const, value: calculateMetric(data.fdv, data.marketCap, "x") },
+    { label: "MCap/TVL", tooltipKey: "mcapTvlRatio" as const, value: calculateMetric(data.marketCap, data.tvl, "x") },
+    { label: "Volume/MCap", tooltipKey: "volumeMcapRatio" as const, value: calculateMetric(data.volume24h, data.marketCap, "x") },
+    { label: "% em Circulação", tooltipKey: "circulatingPercentage" as const, value: calculatePercentage(data.circulating, data.max) },
+  ]
 
   return (
     <Card className="p-6">
@@ -43,10 +44,14 @@ export function AdvancedMetrics({ data }: AdvancedMetricsProps) {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {Object.entries(metrics).map(([key, value]) => (
-          <div key={key} className="p-4 bg-muted/50 rounded-lg border border-border/50">
-            <div className="text-xs text-muted-foreground font-mono mb-1">{key}</div>
-            <div className="text-lg font-bold font-mono text-foreground">{value}</div>
+        {metrics.map((metric) => (
+          <div key={metric.label} className="p-4 bg-muted/50 rounded-lg border border-border/50">
+            <LabelWithTooltip
+              label={metric.label}
+              tooltipKey={metric.tooltipKey}
+              className="text-xs text-muted-foreground font-mono mb-1 block"
+            />
+            <div className="text-lg font-bold font-mono text-foreground">{metric.value}</div>
           </div>
         ))}
       </div>

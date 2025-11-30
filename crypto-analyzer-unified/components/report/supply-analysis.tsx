@@ -1,9 +1,10 @@
 import { Card } from "@/components/ui/card"
 import { CoinsIcon } from "../icons/coins-icon"
 import { InfoIcon } from "../info-icon"
+import { LabelWithTooltip } from "../label-with-tooltip"
 import { CryptoData } from "@/types"
 import { formatLargeNumber } from "@/utils/formatters"
-import { sectionTooltips } from "@/lib/tooltips"
+import { sectionTooltips, fieldTooltips } from "@/lib/tooltips"
 
 interface SupplyAnalysisProps {
   data: CryptoData
@@ -13,6 +14,7 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
   const supplyData = [
     {
       type: "Circulating Supply",
+      tooltipKey: "circulatingSupply" as const,
       quantity: formatLargeNumber(data.circulating),
       percentage:
         data.circulating && data.max
@@ -21,6 +23,7 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
     },
     {
       type: "Total Supply",
+      tooltipKey: "totalSupply" as const,
       quantity: formatLargeNumber(data.total),
       percentage:
         data.total && data.max
@@ -29,11 +32,13 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
     },
     {
       type: "Max Supply",
+      tooltipKey: "maxSupply" as const,
       quantity: formatLargeNumber(data.max),
       percentage: data.max ? "100.00%" : "N/A",
     },
     {
       type: "Tokens Locked",
+      tooltipKey: "tokensLocked" as const,
       quantity:
         data.total && data.circulating
           ? formatLargeNumber(data.total - data.circulating)
@@ -74,7 +79,13 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
                 key={index}
                 className="border-b border-border/50 hover:bg-muted/50 transition-colors"
               >
-                <td className="py-3 px-4 font-mono text-foreground">{item.type}</td>
+                <td className="py-3 px-4 font-mono text-foreground">
+                  <LabelWithTooltip
+                    label={item.type}
+                    tooltipKey={item.tooltipKey}
+                    className="font-mono text-foreground"
+                  />
+                </td>
                 <td className="py-3 px-4 font-mono text-foreground text-right">
                   {item.quantity}
                 </td>

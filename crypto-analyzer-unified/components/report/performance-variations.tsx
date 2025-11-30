@@ -3,11 +3,12 @@
 import { Card } from "@/components/ui/card"
 import { TrendingIcon } from "../icons/trending-icon"
 import { InfoIcon } from "../info-icon"
+import { LabelWithTooltip } from "../label-with-tooltip"
 import { cn } from "@/lib/utils"
 import { CryptoData } from "@/types"
 import { formatPercent, formatNumber } from "@/utils/formatters"
 import { PriceChart } from "./price-chart"
-import { sectionTooltips } from "@/lib/tooltips"
+import { sectionTooltips, fieldTooltips } from "@/lib/tooltips"
 
 interface PerformanceVariationsProps {
   data: CryptoData
@@ -106,9 +107,11 @@ export function PerformanceVariations({ data }: PerformanceVariationsProps) {
               {/* Métricas de variação */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <span className="text-xs text-muted-foreground block mb-1">
-                    Variação de Preço
-                  </span>
+                  <LabelWithTooltip
+                    label="Variação de Preço"
+                    tooltipKey={`priceChange${period.priceKey}` as any}
+                    className="text-xs text-muted-foreground block mb-1"
+                  />
                   <span
                     className={cn(
                       "text-lg font-semibold font-mono",
@@ -124,9 +127,11 @@ export function PerformanceVariations({ data }: PerformanceVariationsProps) {
                 </div>
                 {data.tvl && (
                   <div>
-                    <span className="text-xs text-muted-foreground block mb-1">
-                      Variação de TVL
-                    </span>
+                    <LabelWithTooltip
+                      label="Variação de TVL"
+                      tooltipKey={`tvlChange${period.tvlKey}` as any}
+                      className="text-xs text-muted-foreground block mb-1"
+                    />
                     <span
                       className={cn(
                         "text-lg font-semibold font-mono",

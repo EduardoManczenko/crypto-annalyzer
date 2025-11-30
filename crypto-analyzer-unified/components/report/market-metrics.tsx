@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card"
 import { ChartIcon } from "../icons/chart-icon"
 import { InfoIcon } from "../info-icon"
+import { LabelWithTooltip } from "../label-with-tooltip"
 import { CryptoData } from "@/types"
 import { formatNumber, getMarketCapCategory } from "@/utils/formatters"
 import { sectionTooltips } from "@/lib/tooltips"
@@ -21,23 +22,24 @@ export function MarketMetrics({ data }: MarketMetricsProps) {
       </div>
 
       <div className="space-y-3">
-        <MetricRow label="Market Cap" value={formatNumber(data.marketCap)} />
+        <MetricRow label="Market Cap" tooltipKey="marketCap" value={formatNumber(data.marketCap)} />
         <MetricRow
           label="Cap Category"
+          tooltipKey="capCategory"
           value={`${capCategory.category} (Risco ${capCategory.risk})`}
         />
-        <MetricRow label="FDV (Full Diluted)" value={formatNumber(data.fdv)} />
-        <MetricRow label="Volume 24h" value={formatNumber(data.volume24h)} />
-        <MetricRow label="TVL" value={formatNumber(data.tvl)} highlighted />
+        <MetricRow label="FDV (Full Diluted)" tooltipKey="fdvFull" value={formatNumber(data.fdv)} />
+        <MetricRow label="Volume 24h" tooltipKey="volume24h" value={formatNumber(data.volume24h)} />
+        <MetricRow label="TVL" tooltipKey="tvl" value={formatNumber(data.tvl)} highlighted />
       </div>
     </Card>
   )
 }
 
-function MetricRow({ label, value, highlighted }: { label: string; value: string; highlighted?: boolean }) {
+function MetricRow({ label, tooltipKey, value, highlighted }: { label: string; tooltipKey?: any; value: string; highlighted?: boolean }) {
   return (
     <div className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
-      <span className="text-sm text-muted-foreground font-mono">{label}</span>
+      <LabelWithTooltip label={label} tooltipKey={tooltipKey} className="text-sm text-muted-foreground font-mono" />
       <span className={`text-sm font-semibold font-mono ${highlighted ? "text-accent" : "text-foreground"}`}>
         {value}
       </span>
