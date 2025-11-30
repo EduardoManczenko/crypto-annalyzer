@@ -12,7 +12,7 @@ interface InfoIconProps {
 
 export function InfoIcon({ content, className, iconSize = 16 }: InfoIconProps) {
   return (
-    <InfoTooltip content={content} side="top">
+    <InfoTooltip content={content} side="bottom">
       <div
         className={cn(
           "inline-flex items-center justify-center",
