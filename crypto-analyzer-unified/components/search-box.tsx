@@ -11,11 +11,27 @@ interface SearchBoxProps {
   isLoading: boolean
 }
 
+interface SearchResult {
+  id: string
+  name: string
+  symbol?: string
+  type: 'defi' | 'token' | 'blockchain'
+  source: 'defillama' | 'coingecko'
+  logo?: string
+}
+
 export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
+  // DEBUG: Version timestamp
+  console.log('🚀 SearchBox carregado! Timestamp: 2025-11-30T19:45:00')
+
   const [query, setQuery] = useState("")
-  const [showHistory, setShowHistory] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
   const [history, setHistory] = useState<string[]>([])
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     // Load history from localStorage
@@ -25,28 +41,104 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
     }
   }, [])
 
+  // Buscar resultados em tempo real
+  useEffect(() => {
+    console.log('🎯 [SearchBox] useEffect EXECUTOU! Query:', query, 'Length:', query.length)
+
+    if (searchTimeout.current) {
+      console.log('⏰ [SearchBox] Limpando timeout anterior')
+      clearTimeout(searchTimeout.current)
+    }
+
+    if (query.trim().length < 2) {
+      console.log('⚠️ [SearchBox] Query muito curta, abortando')
+      setSearchResults([])
+      setIsSearching(false)
+      setSearchError(null)
+      return
+    }
+
+    console.log('✨ [SearchBox] Query válida! Iniciando busca em 300ms...')
+    setIsSearching(true)
+    setSearchError(null)
+    setShowDropdown(true)
+
+    searchTimeout.current = setTimeout(async () => {
+      try {
+        console.log('🔍 [SearchBox] Iniciando busca para:', query)
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+        console.log('📡 [SearchBox] Response status:', response.status)
+
+        const data = await response.json()
+        console.log('📦 [SearchBox] Dados recebidos:', data)
+
+        if (response.ok) {
+          setSearchResults(data.results || [])
+          setIsSearching(false)
+          console.log('✅ [SearchBox] Sucesso! Resultados:', data.results?.length || 0)
+          console.log('📋 [SearchBox] Primeiros resultados:', data.results?.slice(0, 3))
+        } else {
+          setSearchError(data.error || 'Erro ao buscar')
+          setIsSearching(false)
+          console.error('❌ [SearchBox] Erro na resposta:', data)
+        }
+      } catch (error) {
+        console.error('💥 [SearchBox] Exceção capturada:', error)
+        setSearchError('Erro de conexão')
+        setIsSearching(false)
+      }
+    }, 300)
+
+    return () => {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current)
+      }
+    }
+  }, [query])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!query.trim() || isLoading) return
 
+    performSearch(query)
+  }
+
+  const performSearch = (searchQuery: string) => {
     // Add to history
-    const newHistory = [query, ...history.filter((h) => h !== query)].slice(0, 10)
+    const newHistory = [searchQuery, ...history.filter((h) => h !== searchQuery)].slice(0, 10)
     setHistory(newHistory)
     localStorage.setItem("searchHistory", JSON.stringify(newHistory))
 
-    onSearch(query)
-    setShowHistory(false)
+    onSearch(searchQuery)
+    setShowDropdown(false)
   }
 
   const handleHistoryClick = (item: string) => {
     setQuery(item)
-    onSearch(item)
-    setShowHistory(false)
+    performSearch(item)
+  }
+
+  const handleResultClick = (result: SearchResult) => {
+    setQuery(result.name)
+    performSearch(result.name)
   }
 
   const clearHistory = () => {
     setHistory([])
     localStorage.removeItem("searchHistory")
+  }
+
+  const getTypeBadge = (type: string) => {
+    switch (type) {
+      case 'blockchain':
+        return <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded font-semibold">Chain</span>
+      case 'defi':
+        return <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded font-semibold">Protocol</span>
+      case 'token':
+        return <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-300 rounded font-semibold">Token</span>
+      default:
+        return null
+    }
   }
 
   return (
@@ -58,7 +150,7 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => setShowHistory(true)}
+            onFocus={() => setShowDropdown(true)}
             placeholder="Search for crypto, DeFi protocol, or blockchain..."
             className={cn(
               "w-full h-14 px-6 pr-14 rounded-xl",
@@ -90,45 +182,104 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
           </button>
         </div>
 
-        {/* Search History Dropdown */}
-        {showHistory && history.length > 0 && (
+        {/* Unified Dropdown - Search Results + History */}
+        {showDropdown && (searchResults.length > 0 || history.length > 0 || isSearching || searchError) && (
           <>
-            <div className="fixed inset-0 z-10" onClick={() => setShowHistory(false)} />
-            <div className="absolute top-full mt-2 w-full bg-card border border-border rounded-xl shadow-2xl z-20 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Recent Searches
-                </span>
-                <button
-                  type="button"
-                  onClick={clearHistory}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Clear
-                </button>
-              </div>
-              <div className="max-h-64 overflow-y-auto">
-                {history.map((item, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => handleHistoryClick(item)}
-                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-muted transition-colors text-left group"
-                  >
-                    <Clock className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
-                    <span className="text-sm font-mono text-foreground flex-1">{item}</span>
-                    <X
-                      className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        const newHistory = history.filter((_, i) => i !== index)
-                        setHistory(newHistory)
-                        localStorage.setItem("searchHistory", JSON.stringify(newHistory))
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
+            <div className="fixed inset-0 z-10" onClick={() => setShowDropdown(false)} />
+            <div className="absolute top-full mt-2 w-full bg-card border border-border rounded-xl shadow-2xl z-20 overflow-hidden max-h-[500px] overflow-y-auto">
+
+              {/* Search Results Section */}
+              {searchResults.length > 0 && (
+                <div className="border-b border-border">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border/50">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <Search className="w-3 h-3" />
+                      <span className="font-bold">{searchResults.length}</span> results found
+                    </span>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {searchResults.map((result, index) => (
+                      <button
+                        key={`${result.source}-${result.id}-${index}`}
+                        type="button"
+                        onClick={() => handleResultClick(result)}
+                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-muted transition-colors text-left group"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-sm">
+                          {result.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-sm font-mono font-semibold text-foreground truncate">
+                              {result.name}
+                            </span>
+                            {getTypeBadge(result.type)}
+                          </div>
+                          {result.symbol && (
+                            <span className="text-xs text-muted-foreground font-mono">{result.symbol}</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Loading State */}
+              {isSearching && (
+                <div className="px-4 py-8 text-center">
+                  <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Searching...</p>
+                </div>
+              )}
+
+              {/* Error State */}
+              {!isSearching && searchError && (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-sm font-semibold text-red-500">Error</p>
+                  <p className="text-xs text-muted-foreground mt-1">{searchError}</p>
+                </div>
+              )}
+
+              {/* History Section */}
+              {history.length > 0 && !isSearching && (
+                <div className={searchResults.length > 0 ? 'border-t border-border' : ''}>
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border/50">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <Clock className="w-3 h-3" />
+                      Recent Searches
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearHistory}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {history.slice(0, 5).map((item, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => handleHistoryClick(item)}
+                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-muted transition-colors text-left group"
+                      >
+                        <Clock className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
+                        <span className="text-sm font-mono text-foreground flex-1">{item}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {!isSearching && !searchError && searchResults.length === 0 && history.length === 0 && query.length >= 2 && (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-sm text-muted-foreground">No results found</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Try another search term</p>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -136,13 +287,13 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
 
       {/* Search suggestions */}
       <div className="mt-4 flex flex-wrap gap-2 justify-center">
-        {["Bitcoin", "Ethereum", "Solana", "Aave", "Uniswap"].map((suggestion) => (
+        {["Bitcoin", "Ethereum", "Solana", "Aave", "Uniswap", "Stellar"].map((suggestion) => (
           <button
             key={suggestion}
             type="button"
             onClick={() => {
               setQuery(suggestion)
-              onSearch(suggestion)
+              performSearch(suggestion)
             }}
             className="px-3 py-1.5 text-xs font-mono bg-muted border border-border rounded-lg hover:border-accent hover:text-accent transition-colors"
           >
