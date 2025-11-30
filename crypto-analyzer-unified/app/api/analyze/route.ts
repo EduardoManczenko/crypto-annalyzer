@@ -29,6 +29,80 @@ const axiosInstance = axios.create({
 });
 
 /**
+ * Helper: Extrai mudanças de TVL
+ */
+function extractTVLChanges(defiData: any) {
+  if (!defiData) {
+    return {
+      '1d': null,
+      '7d': null,
+      '30d': null,
+      '365d': null,
+    };
+  }
+
+  console.log('[TVL Changes] Buscando dados de mudança...');
+  console.log('[TVL Changes] change_1d:', defiData.change_1d);
+  console.log('[TVL Changes] change_7d:', defiData.change_7d);
+  console.log('[TVL Changes] change_1m:', defiData.change_1m);
+
+  // Verificar se há dados no array tvl para calcular mudanças manualmente
+  if (defiData.tvl && Array.isArray(defiData.tvl) && defiData.tvl.length > 1) {
+    const currentTvl = defiData.tvl[defiData.tvl.length - 1]?.totalLiquidityUSD;
+
+    if (currentTvl) {
+      // Tentar calcular mudanças a partir do histórico
+      const now = Date.now() / 1000;
+      const oneDayAgo = now - 86400;
+      const sevenDaysAgo = now - 7 * 86400;
+      const thirtyDaysAgo = now - 30 * 86400;
+
+      const findClosestTvl = (targetTime: number) => {
+        let closest = null;
+        let minDiff = Infinity;
+
+        for (const item of defiData.tvl) {
+          const diff = Math.abs(item.date - targetTime);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = item;
+          }
+        }
+
+        return closest?.totalLiquidityUSD;
+      };
+
+      const tvl1d = findClosestTvl(oneDayAgo);
+      const tvl7d = findClosestTvl(sevenDaysAgo);
+      const tvl30d = findClosestTvl(thirtyDaysAgo);
+
+      const calculate = (oldTvl: number | null) => {
+        if (!oldTvl || oldTvl === 0) return null;
+        return ((currentTvl - oldTvl) / oldTvl) * 100;
+      };
+
+      const calculated = {
+        '1d': defiData.change_1d ?? calculate(tvl1d),
+        '7d': defiData.change_7d ?? calculate(tvl7d),
+        '30d': defiData.change_1m ?? calculate(tvl30d),
+        '365d': null, // DeFiLlama não fornece
+      };
+
+      console.log('[TVL Changes] Valores calculados:', calculated);
+      return calculated;
+    }
+  }
+
+  // Fallback para valores diretos da API
+  return {
+    '1d': defiData.change_1d ?? null,
+    '7d': defiData.change_7d ?? null,
+    '30d': defiData.change_1m ?? null,
+    '365d': null,
+  };
+}
+
+/**
  * Helper: Extrai chainTvls filtrados (sem borrowed, staking, pool2)
  */
 function extractChainTvls(defiData: any): Record<string, number> | null {
@@ -71,26 +145,35 @@ function extractChainTvls(defiData: any): Record<string, number> | null {
 
 /**
  * Helper: Calcula o TVL total a partir dos dados do DeFiLlama
+ * IMPORTANTE: DeFiLlama usa o campo 'tvl' direto do último snapshot.
+ * Este é o valor que aparece no site oficial deles.
  */
 function extractTVL(defiData: any): number | null {
   if (!defiData) return null;
 
-  // Método 1: TVL do último item do array tvl
+  // MÉTODO 1 (PREFERIDO): TVL do último item do array tvl
+  // Este é o método oficial do DeFiLlama - valor exato que aparece no site
   if (defiData.tvl && Array.isArray(defiData.tvl) && defiData.tvl.length > 0) {
     const lastTvl = defiData.tvl[defiData.tvl.length - 1];
     if (lastTvl?.totalLiquidityUSD) {
-      console.log('[TVL] Extraído do array tvl:', lastTvl.totalLiquidityUSD);
+      console.log('[TVL] ✓ Extraído do array tvl (método oficial DeFiLlama):', lastTvl.totalLiquidityUSD);
       return lastTvl.totalLiquidityUSD;
     }
   }
 
-  // Método 2: Somar chains filtradas (SEM -borrowed, -staking, -pool2)
+  // MÉTODO 2: TVL direto como número
+  if (defiData.tvl && typeof defiData.tvl === 'number') {
+    console.log('[TVL] ✓ Valor direto:', defiData.tvl);
+    return defiData.tvl;
+  }
+
+  // MÉTODO 3 (FALLBACK): Somar chains filtradas (SEM -borrowed, -staking, -pool2)
   const chains = extractChainTvls(defiData);
   if (chains) {
     const totalTvl = Object.values(chains).reduce((sum, tvl) => sum + tvl, 0);
 
     if (totalTvl > 0) {
-      console.log('[TVL] Calculado somando chains filtradas:', totalTvl);
+      console.log('[TVL] ⚠ Calculado somando chains filtradas (fallback):', totalTvl);
       console.log('[TVL] Chains incluídas:', Object.keys(chains).length);
       console.log('[TVL] Top 5 chains:',
         Object.entries(chains)
@@ -103,13 +186,7 @@ function extractTVL(defiData: any): number | null {
     }
   }
 
-  // Método 3: TVL direto (alguns protocolos podem ter)
-  if (defiData.tvl && typeof defiData.tvl === 'number') {
-    console.log('[TVL] Valor direto:', defiData.tvl);
-    return defiData.tvl;
-  }
-
-  console.log('[TVL] Nenhum TVL encontrado');
+  console.log('[TVL] ✗ Nenhum TVL encontrado');
   return null;
 }
 
@@ -137,7 +214,41 @@ async function searchDeFiLlama(query: string) {
         { timeout: 10000 }
       );
       console.log(`[DeFiLlama] Detalhes obtidos para ${found.slug}`);
-      return detailResponse.data;
+
+      // Log detalhado dos dados recebidos
+      const data = detailResponse.data;
+      console.log('[DeFiLlama] Campos disponíveis:', Object.keys(data).join(', '));
+      console.log('[DeFiLlama] TVL direto:', data.tvl);
+      console.log('[DeFiLlama] Mudanças de TVL:', {
+        change_1d: data.change_1d,
+        change_7d: data.change_7d,
+        change_1m: data.change_1m,
+      });
+
+      if (data.currentChainTvls) {
+        const chainKeys = Object.keys(data.currentChainTvls);
+        console.log('[DeFiLlama] currentChainTvls keys:', chainKeys.length, 'chains');
+        console.log('[DeFiLlama] Sample chains:', chainKeys.slice(0, 10).join(', '));
+
+        // Calcular soma total incluindo TUDO
+        const totalAll = Object.entries(data.currentChainTvls)
+          .filter(([, v]) => typeof v === 'number')
+          .reduce((sum, [, v]) => sum + (v as number), 0);
+        console.log('[DeFiLlama] Soma TOTAL (incluindo tudo):', totalAll);
+
+        // Calcular soma SEM borrowed/staking/pool2
+        const totalFiltered = Object.entries(data.currentChainTvls)
+          .filter(([k, v]) => {
+            if (typeof v !== 'number') return false;
+            if (k.includes('-borrowed') || k.includes('-staking') || k.includes('-pool2')) return false;
+            if (k === 'staking' || k === 'pool2' || k === 'borrowed') return false;
+            return true;
+          })
+          .reduce((sum, [, v]) => sum + (v as number), 0);
+        console.log('[DeFiLlama] Soma FILTRADA (sem borrowed/staking/pool2):', totalFiltered);
+      }
+
+      return data;
     }
 
     console.log(`[DeFiLlama] Protocolo não encontrado para: ${query}`);
@@ -298,6 +409,7 @@ export async function GET(request: NextRequest) {
     // Extrair TVL e chains corretamente
     const tvl = extractTVL(defiData);
     const chains = extractChainTvls(defiData);
+    const tvlChange = extractTVLChanges(defiData);
 
     // Consolidar dados
     const data: CryptoData = {
@@ -311,12 +423,7 @@ export async function GET(request: NextRequest) {
       total: coinData?.market_data?.total_supply || null,
       max: coinData?.market_data?.max_supply || null,
       tvl,
-      tvlChange: {
-        '1d': defiData?.change_1d || null,
-        '7d': defiData?.change_7d || null,
-        '30d': defiData?.change_1m || null,
-        '365d': null, // DeFiLlama não fornece mudança de 365d
-      },
+      tvlChange,
       priceChange: {
         '24h': coinData?.market_data?.price_change_percentage_24h || null,
         '7d': coinData?.market_data?.price_change_percentage_7d || null,
