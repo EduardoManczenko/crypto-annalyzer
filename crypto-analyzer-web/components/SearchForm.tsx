@@ -37,11 +37,15 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
   // Buscar resultados em tempo real
   useEffect(() => {
+    console.log('🎯 [SearchForm] useEffect EXECUTOU! Query:', query, 'Length:', query.length);
+
     if (searchTimeout.current) {
+      console.log('⏰ [SearchForm] Limpando timeout anterior');
       clearTimeout(searchTimeout.current);
     }
 
     if (query.trim().length < 2) {
+      console.log('⚠️ [SearchForm] Query muito curta, abortando');
       setSearchResults([]);
       setShowResults(false);
       setIsSearching(false);
@@ -49,6 +53,7 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       return;
     }
 
+    console.log('✨ [SearchForm] Query válida! Iniciando busca em 300ms...');
     setIsSearching(true);
     setSearchError(null);
     setShowResults(true);
