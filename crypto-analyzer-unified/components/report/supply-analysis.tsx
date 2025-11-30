@@ -1,7 +1,9 @@
 import { Card } from "@/components/ui/card"
 import { CoinsIcon } from "../icons/coins-icon"
+import { InfoIcon } from "../info-icon"
 import { CryptoData } from "@/types"
 import { formatLargeNumber } from "@/utils/formatters"
+import { sectionTooltips } from "@/lib/tooltips"
 
 interface SupplyAnalysisProps {
   data: CryptoData
@@ -48,6 +50,7 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
       <div className="flex items-center gap-3 mb-4">
         <CoinsIcon className="w-5 h-5 text-accent" />
         <h3 className="text-lg font-semibold">Análise de Supply</h3>
+        <InfoIcon content={sectionTooltips.supplyAnalysis.description} iconSize={14} />
       </div>
 
       <div className="overflow-x-auto">

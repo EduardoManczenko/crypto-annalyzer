@@ -7,52 +7,52 @@ export const sectionTooltips = {
   basicInfo: {
     title: "Informações Básicas",
     description:
-      "Dados fundamentais sobre o ativo, incluindo nome, símbolo, categoria e blockchain de origem. Estas informações ajudam a identificar e classificar o protocolo ou token.",
+      "Identifica o ativo mostrando nome, símbolo e categoria. Essencial para confirmar que você está analisando o protocolo/token correto e entender seu tipo (DEX, Lending, Chain, etc.).",
   },
   marketMetrics: {
     title: "Métricas de Mercado",
     description:
-      "Indicadores financeiros atuais do mercado, como capitalização de mercado, volume de negociação e TVL (Total Value Locked). Essas métricas mostram o tamanho e atividade do ativo.",
+      "Mostra o tamanho e liquidez do ativo através de Market Cap (valor total), Volume 24h (atividade de trading) e TVL (capital depositado). Quanto maiores esses números, geralmente mais estabelecido é o projeto.",
   },
   supplyAnalysis: {
     title: "Análise de Supply",
     description:
-      "Informações sobre a distribuição e disponibilidade de tokens, incluindo supply circulante, máximo e bloqueado. Crucial para entender a economia do token e potencial inflacionário.",
+      "Explica quantos tokens existem, quantos estão circulando e quantos ainda podem ser criados. Importante para avaliar se há risco de inflação (diluição do seu investimento) ou se tokens estão bloqueados.",
   },
   performanceVariations: {
     title: "Variações de Performance",
     description:
-      "Mudanças percentuais no preço e TVL em diferentes períodos (24h, 7d, 30d). Permite avaliar a volatilidade e tendência de curto/médio prazo do ativo.",
+      "Mostra como o preço e TVL mudaram nas últimas 24h, 7 dias e 30 dias. Percentuais positivos (verde) indicam crescimento, negativos (vermelho) indicam queda. Use para avaliar momentum e volatilidade.",
   },
   advancedMetrics: {
     title: "Métricas Avançadas",
     description:
-      "Indicadores técnicos e fundamentalistas avançados como volume/market cap ratio, FDV (Fully Diluted Valuation) e métricas de liquidez. Para análise mais profunda do ativo.",
+      "Indicadores mais técnicos para análise profunda: FDV (valor se todos tokens existissem), Volume/MCap ratio (quão ativo é o trading), e outras métricas de liquidez e eficiência do protocolo.",
   },
   tvlDistribution: {
     title: "Distribuição de TVL",
     description:
-      "Mostra como o valor total bloqueado (TVL) está distribuído entre diferentes blockchains. Indica diversificação e risco de concentração em uma única chain.",
+      "Mostra em quais blockchains o protocolo opera e quanto capital tem em cada uma. Diversificação entre várias chains = menos risco. Concentração em uma única chain = mais risco se essa chain tiver problemas.",
   },
   riskScore: {
     title: "Score de Risco",
     description:
-      "Avaliação automatizada do nível de risco do investimento, considerando fatores como volatilidade, liquidez, centralização e histórico. Escala de 0-100.",
+      "Nota de 0-100 calculada automaticamente considerando volatilidade, liquidez, descentralização e outros fatores. Quanto menor o score, menor o risco. Use como referência inicial, não como única decisão.",
   },
   warnings: {
     title: "Alertas e Avisos",
     description:
-      "Red flags identificadas automaticamente que podem indicar riscos elevados, como baixa liquidez, alta concentração de supply, ou métricas suspeitas.",
+      "Red flags detectados automaticamente que podem indicar problemas: baixa liquidez (difícil vender), alta concentração (poucos holders), métricas inconsistentes, etc. SEMPRE investigue estes alertas antes de investir.",
   },
   positivePoints: {
     title: "Pontos Positivos",
     description:
-      "Aspectos favoráveis identificados na análise, como boa liquidez, crescimento consistente, ou fundamentos sólidos. Green flags do investimento.",
+      "Green flags identificados na análise: boa liquidez, crescimento sustentável, descentralização adequada, volume saudável, etc. Aspectos favoráveis que aumentam a confiança no projeto.",
   },
   recommendation: {
     title: "Recomendação Final",
     description:
-      "Sugestão de ação baseada na análise completa de todos os indicadores. Lembre-se: não é conselho financeiro, apenas análise técnica automatizada.",
+      "Sugestão automatizada baseada em TODOS os dados analisados: Compra Forte, Compra, Neutro, Venda ou Venda Forte. IMPORTANTE: Isto NÃO é conselho financeiro! É apenas análise técnica. Faça sua própria pesquisa (DYOR).",
   },
 }
 

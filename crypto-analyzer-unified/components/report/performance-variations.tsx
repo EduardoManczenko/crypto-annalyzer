@@ -2,10 +2,12 @@
 
 import { Card } from "@/components/ui/card"
 import { TrendingIcon } from "../icons/trending-icon"
+import { InfoIcon } from "../info-icon"
 import { cn } from "@/lib/utils"
 import { CryptoData } from "@/types"
 import { formatPercent, formatNumber } from "@/utils/formatters"
 import { PriceChart } from "./price-chart"
+import { sectionTooltips } from "@/lib/tooltips"
 
 interface PerformanceVariationsProps {
   data: CryptoData
@@ -66,6 +68,7 @@ export function PerformanceVariations({ data }: PerformanceVariationsProps) {
         <div className="flex items-center gap-3 mb-3">
           <TrendingIcon className="w-5 h-5 text-accent" />
           <h3 className="text-lg font-semibold">Variações de Performance</h3>
+          <InfoIcon content={sectionTooltips.performanceVariations.description} iconSize={14} />
         </div>
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-bold font-mono text-accent">

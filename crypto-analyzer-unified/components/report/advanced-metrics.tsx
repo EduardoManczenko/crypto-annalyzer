@@ -1,6 +1,8 @@
 import { Card } from "@/components/ui/card"
 import { CalculatorIcon } from "../icons/calculator-icon"
+import { InfoIcon } from "../info-icon"
 import { CryptoData } from "@/types"
+import { sectionTooltips } from "@/lib/tooltips"
 
 interface AdvancedMetricsProps {
   data: CryptoData
@@ -37,6 +39,7 @@ export function AdvancedMetrics({ data }: AdvancedMetricsProps) {
       <div className="flex items-center gap-3 mb-4">
         <CalculatorIcon className="w-5 h-5 text-accent" />
         <h3 className="text-lg font-semibold">Ratios e Métricas Avançadas</h3>
+        <InfoIcon content={sectionTooltips.advancedMetrics.description} iconSize={14} />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

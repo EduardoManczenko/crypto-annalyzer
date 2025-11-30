@@ -1,6 +1,8 @@
 import { Card } from "@/components/ui/card"
 import { AlertIcon } from "../icons/alert-icon"
+import { InfoIcon } from "../info-icon"
 import { RiskAnalysis } from "@/types"
+import { sectionTooltips } from "@/lib/tooltips"
 
 interface WarningsProps {
   data: RiskAnalysis
@@ -16,6 +18,7 @@ export function Warnings({ data }: WarningsProps) {
       <div className="flex items-center gap-3 mb-4">
         <AlertIcon className="w-5 h-5 text-warning" />
         <h3 className="text-lg font-semibold text-warning">WARNINGS & RED FLAGS</h3>
+        <InfoIcon content={sectionTooltips.warnings.description} iconSize={14} />
       </div>
 
       <ul className="space-y-2">

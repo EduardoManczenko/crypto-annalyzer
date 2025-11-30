@@ -1,7 +1,9 @@
 import { Card } from "@/components/ui/card"
 import { ChartIcon } from "../icons/chart-icon"
+import { InfoIcon } from "../info-icon"
 import { CryptoData } from "@/types"
 import { formatNumber, getMarketCapCategory } from "@/utils/formatters"
+import { sectionTooltips } from "@/lib/tooltips"
 
 interface MarketMetricsProps {
   data: CryptoData
@@ -15,6 +17,7 @@ export function MarketMetrics({ data }: MarketMetricsProps) {
       <div className="flex items-center gap-3 mb-4">
         <ChartIcon className="w-5 h-5 text-accent" />
         <h3 className="text-lg font-semibold">Métricas de Mercado</h3>
+        <InfoIcon content={sectionTooltips.marketMetrics.description} iconSize={14} />
       </div>
 
       <div className="space-y-3">
