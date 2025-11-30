@@ -2,8 +2,9 @@ import { Card } from "@/components/ui/card"
 import { CalculatorIcon } from "../icons/calculator-icon"
 import { InfoIcon } from "../info-icon"
 import { LabelWithTooltip } from "../label-with-tooltip"
+import { DataValue } from "../data-value"
 import { CryptoData } from "@/types"
-import { sectionTooltips } from "@/lib/tooltips"
+import { sectionTooltips, getSourceColor } from "@/lib/tooltips"
 
 interface AdvancedMetricsProps {
   data: CryptoData
@@ -51,7 +52,12 @@ export function AdvancedMetrics({ data }: AdvancedMetricsProps) {
               tooltipKey={metric.tooltipKey}
               className="text-xs text-muted-foreground font-mono mb-1 block"
             />
-            <div className="text-lg font-bold font-mono text-foreground">{metric.value}</div>
+            <div className="text-lg font-bold font-mono text-foreground">
+              <DataValue
+                value={metric.value}
+                source={{ name: "Análise Interna", color: getSourceColor("unknown") }}
+              />
+            </div>
           </div>
         ))}
       </div>

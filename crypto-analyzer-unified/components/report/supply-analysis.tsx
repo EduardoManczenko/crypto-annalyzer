@@ -2,9 +2,10 @@ import { Card } from "@/components/ui/card"
 import { CoinsIcon } from "../icons/coins-icon"
 import { InfoIcon } from "../info-icon"
 import { LabelWithTooltip } from "../label-with-tooltip"
+import { DataValue } from "../data-value"
 import { CryptoData } from "@/types"
 import { formatLargeNumber } from "@/utils/formatters"
-import { sectionTooltips, fieldTooltips } from "@/lib/tooltips"
+import { sectionTooltips, fieldTooltips, getSourceColor } from "@/lib/tooltips"
 
 interface SupplyAnalysisProps {
   data: CryptoData
@@ -87,10 +88,16 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
                   />
                 </td>
                 <td className="py-3 px-4 font-mono text-foreground text-right">
-                  {item.quantity}
+                  <DataValue
+                    value={item.quantity}
+                    source={{ name: "CoinGecko", color: getSourceColor("coingecko") }}
+                  />
                 </td>
                 <td className="py-3 px-4 font-mono text-accent text-right font-semibold">
-                  {item.percentage}
+                  <DataValue
+                    value={item.percentage}
+                    source={{ name: "Análise Interna", color: getSourceColor("unknown") }}
+                  />
                 </td>
               </tr>
             ))}

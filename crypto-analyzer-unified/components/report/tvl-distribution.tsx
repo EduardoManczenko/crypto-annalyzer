@@ -1,9 +1,10 @@
 import { Card } from "@/components/ui/card"
 import { NetworkIcon } from "../icons/network-icon"
 import { InfoIcon } from "../info-icon"
+import { DataValue } from "../data-value"
 import { CryptoData } from "@/types"
 import { formatNumber } from "@/utils/formatters"
-import { sectionTooltips } from "@/lib/tooltips"
+import { sectionTooltips, getSourceColor } from "@/lib/tooltips"
 
 interface TvlDistributionProps {
   data: CryptoData
@@ -39,7 +40,10 @@ export function TvlDistribution({ data }: TvlDistributionProps) {
             <div className="flex justify-between items-center">
               <span className="text-sm font-mono text-foreground">{item.blockchain}</span>
               <span className="text-sm font-semibold font-mono text-accent">
-                {formatNumber(item.tvl)} ({item.percentage})
+                <DataValue
+                  value={`${formatNumber(item.tvl)} (${item.percentage})`}
+                  source={{ name: "DeFiLlama", url: "https://defillama.com", color: getSourceColor("defillama") }}
+                />
               </span>
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
