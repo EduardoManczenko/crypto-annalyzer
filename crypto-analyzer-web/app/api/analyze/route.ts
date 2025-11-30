@@ -23,7 +23,11 @@ const API_ENDPOINTS = {
 const axiosInstance = axios.create({
   timeout: 15000, // 15 segundos
   headers: {
-    'User-Agent': 'CryptoAnalyzer/1.0',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://defillama.com/',
+    'Origin': 'https://defillama.com',
   }
 });
 
