@@ -1,3 +1,15 @@
+export interface PricePoint {
+  timestamp: number;
+  price: number;
+}
+
+export interface ChartData {
+  '24h': PricePoint[];
+  '7d': PricePoint[];
+  '30d': PricePoint[];
+  '365d': PricePoint[];
+}
+
 export interface CryptoData {
   name: string;
   symbol: string;
@@ -13,12 +25,15 @@ export interface CryptoData {
     '1d': number | null;
     '7d': number | null;
     '30d': number | null;
+    '365d': number | null;
   };
   priceChange: {
     '24h': number | null;
     '7d': number | null;
     '30d': number | null;
+    '365d': number | null;
   };
+  priceHistory?: ChartData;
   chains: Record<string, number> | null;
   category: string;
 }
