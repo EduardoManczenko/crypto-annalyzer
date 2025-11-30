@@ -15,6 +15,8 @@ const API_ENDPOINTS = {
   coingecko: {
     search: 'https://api.coingecko.com/api/v3/search',
     coin: (id: string) => `https://api.coingecko.com/api/v3/coins/${id}`,
+    marketChart: (id: string, days: number) =>
+      `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`,
   }
 };
 
@@ -169,9 +171,48 @@ async function searchCoinGecko(query: string) {
       { timeout: 10000 }
     );
     console.log(`[CoinGecko] Dados obtidos para ${coin.id}`);
-    return coinResponse.data;
+
+    // Retornar dados com o ID para uso posterior
+    return {
+      ...coinResponse.data,
+      _coinId: coin.id
+    };
   } catch (error: any) {
     console.error('[CoinGecko] Erro:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Busca histórico de preços no CoinGecko
+ */
+async function fetchPriceHistory(coinId: string) {
+  try {
+    console.log(`[CoinGecko] Buscando histórico de preços para: ${coinId}`);
+
+    // Buscar dados para diferentes períodos em paralelo
+    const [data1d, data7d, data30d, data365d] = await Promise.all([
+      axiosInstance.get(API_ENDPOINTS.coingecko.marketChart(coinId, 1), { timeout: 10000 }),
+      axiosInstance.get(API_ENDPOINTS.coingecko.marketChart(coinId, 7), { timeout: 10000 }),
+      axiosInstance.get(API_ENDPOINTS.coingecko.marketChart(coinId, 30), { timeout: 10000 }),
+      axiosInstance.get(API_ENDPOINTS.coingecko.marketChart(coinId, 365), { timeout: 10000 }),
+    ]);
+
+    // Formatar dados para o formato esperado
+    const formatPrices = (prices: any[]) =>
+      prices.map(([timestamp, price]: [number, number]) => ({
+        timestamp,
+        price
+      }));
+
+    return {
+      '24h': formatPrices(data1d.data.prices || []),
+      '7d': formatPrices(data7d.data.prices || []),
+      '30d': formatPrices(data30d.data.prices || []),
+      '365d': formatPrices(data365d.data.prices || []),
+    };
+  } catch (error: any) {
+    console.error('[CoinGecko] Erro ao buscar histórico:', error.message);
     return null;
   }
 }
@@ -222,6 +263,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Buscar histórico de preços se temos dados do CoinGecko
+    let priceHistory = null;
+    if (coinData?._coinId) {
+      priceHistory = await fetchPriceHistory(coinData._coinId);
+      console.log(`[API] Histórico de preços obtido:`, {
+        '24h': priceHistory?.['24h']?.length || 0,
+        '7d': priceHistory?.['7d']?.length || 0,
+        '30d': priceHistory?.['30d']?.length || 0,
+        '365d': priceHistory?.['365d']?.length || 0,
+      });
+    }
+
     // Extrair TVL e chains corretamente
     const tvl = extractTVL(defiData);
     const chains = extractChainTvls(defiData);
@@ -242,12 +295,15 @@ export async function GET(request: NextRequest) {
         '1d': defiData?.change_1d || null,
         '7d': defiData?.change_7d || null,
         '30d': defiData?.change_1m || null,
+        '365d': null, // DeFiLlama não fornece mudança de 365d
       },
       priceChange: {
         '24h': coinData?.market_data?.price_change_percentage_24h || null,
         '7d': coinData?.market_data?.price_change_percentage_7d || null,
         '30d': coinData?.market_data?.price_change_percentage_30d || null,
+        '365d': coinData?.market_data?.price_change_percentage_1y || null,
       },
+      priceHistory: priceHistory || undefined,
       chains,
       category: defiData?.category || coinData?.categories?.[0] || 'N/A',
     };

@@ -20,7 +20,6 @@ export function TvlDistribution({ data }: TvlDistributionProps) {
       percentageNum: totalTvl > 0 ? (tvl / totalTvl) * 100 : 0,
     }))
     .sort((a, b) => b.tvl - a.tvl)
-    .slice(0, 10) // Top 10 chains
 
   if (distribution.length === 0) return null
 
