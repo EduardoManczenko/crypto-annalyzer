@@ -1,7 +1,9 @@
 import { Card } from "@/components/ui/card"
 import { ShieldIcon } from "../icons/shield-icon"
+import { InfoIcon } from "../info-icon"
 import { cn } from "@/lib/utils"
 import { RiskScore as RiskScoreType } from "@/types"
+import { sectionTooltips } from "@/lib/tooltips"
 
 interface RiskScoreProps {
   data: RiskScoreType
@@ -25,6 +27,7 @@ export function RiskScore({ data }: RiskScoreProps) {
       <div className="flex items-center justify-center gap-3 mb-6">
         <ShieldIcon className="w-6 h-6 text-accent" />
         <h3 className="text-2xl font-semibold">Score de Risco</h3>
+        <InfoIcon content={sectionTooltips.riskScore.description} iconSize={14} />
       </div>
 
       <div className="max-w-md mx-auto space-y-6">
