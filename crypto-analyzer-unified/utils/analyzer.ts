@@ -1,13 +1,17 @@
 import { CryptoData, RiskAnalysis, RiskScore } from '@/types';
 
+/**
+ * Calcula red flags, warnings e pontos positivos com base nos dados
+ */
 export function calculateRedFlags(data: CryptoData): RiskAnalysis {
   const flags: string[] = [];
   const warnings: string[] = [];
   const positives: string[] = [];
 
-  // Supply Analysis
+  // ========== ANÁLISE DE SUPPLY ==========
   if (data.circulating && data.total) {
     const circulatingPercent = (data.circulating / data.total) * 100;
+
     if (circulatingPercent < 30) {
       flags.push(`🚨 Apenas ${circulatingPercent.toFixed(1)}% em circulação - Alto risco de diluição!`);
     } else if (circulatingPercent < 50) {
@@ -17,9 +21,10 @@ export function calculateRedFlags(data: CryptoData): RiskAnalysis {
     }
   }
 
-  // FDV/MCap Ratio
+  // ========== ANÁLISE FDV/MCAP RATIO ==========
   if (data.fdv && data.marketCap) {
     const ratio = data.fdv / data.marketCap;
+
     if (ratio > 10) {
       flags.push(`🚨 FDV/MCap ratio de ${ratio.toFixed(1)}x - RISCO EXTREMO de diluição!`);
     } else if (ratio > 3) {
@@ -29,9 +34,10 @@ export function calculateRedFlags(data: CryptoData): RiskAnalysis {
     }
   }
 
-  // Volume Analysis
+  // ========== ANÁLISE DE VOLUME ==========
   if (data.volume24h && data.marketCap) {
     const volumeRatio = (data.volume24h / data.marketCap) * 100;
+
     if (volumeRatio < 1) {
       flags.push(`🚨 Volume 24h de apenas ${volumeRatio.toFixed(2)}% do Market Cap - Liquidez MUITO baixa!`);
     } else if (volumeRatio < 5) {
@@ -41,9 +47,10 @@ export function calculateRedFlags(data: CryptoData): RiskAnalysis {
     }
   }
 
-  // TVL Analysis (DeFi)
+  // ========== ANÁLISE TVL (DeFi) ==========
   if (data.tvl && data.marketCap) {
     const mcapTvlRatio = data.marketCap / data.tvl;
+
     if (mcapTvlRatio < 0.5) {
       positives.push(`✅ MCap/TVL de ${mcapTvlRatio.toFixed(2)} - Potencialmente subvalorizado!`);
     } else if (mcapTvlRatio > 3) {
@@ -51,25 +58,30 @@ export function calculateRedFlags(data: CryptoData): RiskAnalysis {
     }
   }
 
-  // TVL Change Analysis
+  // ========== ANÁLISE DE MUDANÇA DE TVL ==========
   if (data.tvlChange) {
-    if (data.tvlChange['7d'] && data.tvlChange['7d'] < -20) {
-      flags.push(`🚨 TVL caiu ${Math.abs(data.tvlChange['7d']).toFixed(1)}% em 7 dias - Fuga de capital!`);
-    } else if (data.tvlChange['7d'] && data.tvlChange['7d'] > 20) {
-      positives.push(`✅ TVL cresceu ${data.tvlChange['7d'].toFixed(1)}% em 7 dias - Forte entrada de capital!`);
+    const tvlChange7d = data.tvlChange['7d'];
+
+    if (tvlChange7d !== null && tvlChange7d < -20) {
+      flags.push(`🚨 TVL caiu ${Math.abs(tvlChange7d).toFixed(1)}% em 7 dias - Fuga de capital!`);
+    } else if (tvlChange7d !== null && tvlChange7d > 20) {
+      positives.push(`✅ TVL cresceu ${tvlChange7d.toFixed(1)}% em 7 dias - Forte entrada de capital!`);
     }
   }
 
-  // Price Change Analysis
+  // ========== ANÁLISE DE MUDANÇA DE PREÇO ==========
   if (data.priceChange) {
-    if (data.priceChange['7d'] && data.priceChange['7d'] < -30) {
-      warnings.push(`⚠️  Preço caiu ${Math.abs(data.priceChange['7d']).toFixed(1)}% em 7 dias - Alta volatilidade`);
+    const priceChange7d = data.priceChange['7d'];
+
+    if (priceChange7d !== null && priceChange7d < -30) {
+      warnings.push(`⚠️  Preço caiu ${Math.abs(priceChange7d).toFixed(1)}% em 7 dias - Alta volatilidade`);
     }
   }
 
-  // Market Cap Category
+  // ========== CATEGORIA DE MARKET CAP ==========
   if (data.marketCap) {
     const { category, risk } = getMarketCapCategory(data.marketCap);
+
     if (risk === 'Alto') {
       warnings.push(`⚠️  ${category} - Maior risco e volatilidade`);
     } else if (risk === 'Baixo') {
@@ -80,19 +92,27 @@ export function calculateRedFlags(data: CryptoData): RiskAnalysis {
   return { flags, warnings, positives };
 }
 
-export function calculateRiskScore(redFlags: number, warnings: number, positives: number): RiskScore {
+/**
+ * Calcula o score de risco geral (0-100)
+ */
+export function calculateRiskScore(
+  redFlags: number,
+  warnings: number,
+  positives: number
+): RiskScore {
   let score = 50; // Base score
 
-  // Penalties
-  score -= redFlags * 15; // -15 por red flag
-  score -= warnings * 5;  // -5 por warning
+  // Penalidades
+  score -= redFlags * 15;  // -15 por red flag crítico
+  score -= warnings * 5;   // -5 por warning
 
-  // Bonuses
-  score += positives * 8; // +8 por ponto positivo
+  // Bônus
+  score += positives * 8;  // +8 por ponto positivo
 
-  // Clamp entre 0-100
+  // Limitar score entre 0-100
   score = Math.max(0, Math.min(100, score));
 
+  // Determinar classificação e recomendação
   let classification: string;
   let recommendation: string;
 
@@ -116,8 +136,15 @@ export function calculateRiskScore(redFlags: number, warnings: number, positives
   return { score, classification, recommendation };
 }
 
+/**
+ * Helper: Determina categoria de market cap
+ */
 function getMarketCapCategory(mcap: number): { category: string; risk: string } {
-  if (mcap >= 10e9) return { category: 'Large-Cap', risk: 'Baixo' };
-  if (mcap >= 1e9) return { category: 'Mid-Cap', risk: 'Médio' };
+  if (mcap >= 10e9) {
+    return { category: 'Large-Cap', risk: 'Baixo' };
+  }
+  if (mcap >= 1e9) {
+    return { category: 'Mid-Cap', risk: 'Médio' };
+  }
   return { category: 'Small-Cap', risk: 'Alto' };
 }
