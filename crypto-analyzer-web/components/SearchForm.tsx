@@ -55,27 +55,29 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
     searchTimeout.current = setTimeout(async () => {
       try {
-        console.log('[SearchForm] Buscando:', query);
+        console.log('🔍 [SearchForm] Iniciando busca para:', query);
         const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        const data = await response.json();
+        console.log('📡 [SearchForm] Response status:', response.status);
 
-        console.log('[SearchForm] Resposta:', data);
+        const data = await response.json();
+        console.log('📦 [SearchForm] Dados recebidos:', data);
 
         if (response.ok) {
           setSearchResults(data.results || []);
           setIsSearching(false);
-          console.log('[SearchForm] Resultados encontrados:', data.results?.length || 0);
+          console.log('✅ [SearchForm] Sucesso! Resultados:', data.results?.length || 0);
+          console.log('📋 [SearchForm] Primeiros resultados:', data.results?.slice(0, 3));
         } else {
           setSearchError(data.error || 'Erro ao buscar');
           setIsSearching(false);
-          console.error('[SearchForm] Erro na resposta:', data);
+          console.error('❌ [SearchForm] Erro na resposta:', data);
         }
       } catch (error) {
-        console.error('[SearchForm] Erro na busca:', error);
+        console.error('💥 [SearchForm] Exceção capturada:', error);
         setSearchError('Erro de conexão');
         setIsSearching(false);
       }
-    }, 500);
+    }, 300);
 
     return () => {
       if (searchTimeout.current) {
