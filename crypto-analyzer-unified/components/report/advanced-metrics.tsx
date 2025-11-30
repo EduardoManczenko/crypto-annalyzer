@@ -30,10 +30,30 @@ export function AdvancedMetrics({ data }: AdvancedMetricsProps) {
   }
 
   const metrics = [
-    { label: "FDV/MCap", tooltipKey: "fdvMcapRatio" as const, value: calculateMetric(data.fdv, data.marketCap, "x") },
-    { label: "MCap/TVL", tooltipKey: "mcapTvlRatio" as const, value: calculateMetric(data.marketCap, data.tvl, "x") },
-    { label: "Volume/MCap", tooltipKey: "volumeMcapRatio" as const, value: calculateMetric(data.volume24h, data.marketCap, "x") },
-    { label: "% em Circulação", tooltipKey: "circulatingPercentage" as const, value: calculatePercentage(data.circulating, data.max) },
+    {
+      label: "FDV/MCap",
+      tooltipKey: "fdvMcapRatio" as const,
+      value: calculateMetric(data.fdv, data.marketCap, "x"),
+      formula: "FDV ÷ Market Cap"
+    },
+    {
+      label: "MCap/TVL",
+      tooltipKey: "mcapTvlRatio" as const,
+      value: calculateMetric(data.marketCap, data.tvl, "x"),
+      formula: "Market Cap ÷ TVL"
+    },
+    {
+      label: "Volume/MCap",
+      tooltipKey: "volumeMcapRatio" as const,
+      value: calculateMetric(data.volume24h, data.marketCap, "x"),
+      formula: "Volume 24h ÷ Market Cap"
+    },
+    {
+      label: "% em Circulação",
+      tooltipKey: "circulatingPercentage" as const,
+      value: calculatePercentage(data.circulating, data.max),
+      formula: "(Circulating Supply ÷ Max Supply) × 100"
+    },
   ]
 
   return (
@@ -55,7 +75,11 @@ export function AdvancedMetrics({ data }: AdvancedMetricsProps) {
             <div className="text-lg font-bold font-mono text-foreground">
               <DataValue
                 value={metric.value}
-                source={{ name: "Análise Interna", color: getSourceColor("unknown") }}
+                source={{
+                  name: "Análise Interna",
+                  formula: metric.formula,
+                  color: getSourceColor("unknown")
+                }}
               />
             </div>
           </div>

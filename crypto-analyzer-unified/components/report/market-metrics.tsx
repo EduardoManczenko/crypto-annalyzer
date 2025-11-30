@@ -27,32 +27,56 @@ export function MarketMetrics({ data }: MarketMetricsProps) {
           label="Market Cap"
           tooltipKey="marketCap"
           value={formatNumber(data.marketCap)}
-          source={{ name: "CoinGecko", color: getSourceColor("coingecko") }}
+          source={{
+            name: "CoinGecko",
+            apiEndpoint: `https://api.coingecko.com/api/v3/coins/${data.symbol?.toLowerCase()}`,
+            color: getSourceColor("coingecko")
+          }}
         />
         <MetricRow
           label="Cap Category"
           tooltipKey="capCategory"
           value={`${capCategory.category} (Risco ${capCategory.risk})`}
-          source={{ name: "Análise Interna", color: getSourceColor("unknown") }}
+          source={{
+            name: "Análise Interna",
+            formula: `Market Cap >= $10B → Large Cap (Baixo)
+Market Cap >= $1B → Mid Cap (Médio)
+Market Cap >= $100M → Small Cap (Alto)
+Market Cap < $100M → Micro Cap (Muito Alto)`,
+            color: getSourceColor("unknown")
+          }}
         />
         <MetricRow
           label="FDV (Full Diluted)"
           tooltipKey="fdvFull"
           value={formatNumber(data.fdv)}
-          source={{ name: "CoinGecko", color: getSourceColor("coingecko") }}
+          source={{
+            name: "CoinGecko",
+            apiEndpoint: `https://api.coingecko.com/api/v3/coins/${data.symbol?.toLowerCase()}`,
+            color: getSourceColor("coingecko")
+          }}
         />
         <MetricRow
           label="Volume 24h"
           tooltipKey="volume24h"
           value={formatNumber(data.volume24h)}
-          source={{ name: "CoinGecko", color: getSourceColor("coingecko") }}
+          source={{
+            name: "CoinGecko",
+            apiEndpoint: `https://api.coingecko.com/api/v3/coins/${data.symbol?.toLowerCase()}`,
+            color: getSourceColor("coingecko")
+          }}
         />
         <MetricRow
           label="TVL"
           tooltipKey="tvl"
           value={formatNumber(data.tvl)}
           highlighted
-          source={{ name: "DeFiLlama", url: `https://defillama.com/protocol/${data.name?.toLowerCase()}`, color: getSourceColor("defillama") }}
+          source={{
+            name: "DeFiLlama",
+            apiEndpoint: `https://api.llama.fi/protocol/${data.name?.toLowerCase()}`,
+            url: `https://defillama.com/protocol/${data.name?.toLowerCase()}`,
+            color: getSourceColor("defillama")
+          }}
         />
       </div>
     </Card>
@@ -64,7 +88,7 @@ interface MetricRowProps {
   tooltipKey?: any
   value: string
   highlighted?: boolean
-  source?: { name: string; url?: string; color?: string }
+  source?: { name: string; url?: string; apiEndpoint?: string; color?: string; formula?: string }
 }
 
 function MetricRow({ label, tooltipKey, value, highlighted, source }: MetricRowProps) {

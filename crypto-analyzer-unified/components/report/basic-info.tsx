@@ -25,19 +25,31 @@ export function BasicInfo({ data }: BasicInfoProps) {
           label="Nome"
           labelTooltip={fieldTooltips.name}
           value={data.name || "N/A"}
-          source={data.name ? { name: "DeFiLlama" } : undefined}
+          source={data.name ? {
+            name: "DeFiLlama",
+            apiEndpoint: `https://api.llama.fi/protocol/${data.name?.toLowerCase()}`,
+            color: getSourceColor("defillama")
+          } : undefined}
         />
         <InfoRow
           label="Símbolo"
           labelTooltip={fieldTooltips.symbol}
           value={data.symbol?.toUpperCase() || "N/A"}
-          source={data.symbol ? { name: "DeFiLlama" } : undefined}
+          source={data.symbol ? {
+            name: "DeFiLlama",
+            apiEndpoint: `https://api.llama.fi/protocol/${data.name?.toLowerCase()}`,
+            color: getSourceColor("defillama")
+          } : undefined}
         />
         <InfoRow
           label="Categoria"
           labelTooltip={fieldTooltips.category}
           value={data.category || "N/A"}
-          source={data.category ? { name: "DeFiLlama" } : undefined}
+          source={data.category ? {
+            name: "DeFiLlama",
+            apiEndpoint: `https://api.llama.fi/protocol/${data.name?.toLowerCase()}`,
+            color: getSourceColor("defillama")
+          } : undefined}
         />
         <InfoRow
           label="Preço Atual"
@@ -47,6 +59,7 @@ export function BasicInfo({ data }: BasicInfoProps) {
             data.price
               ? {
                   name: "CoinGecko",
+                  apiEndpoint: `https://api.coingecko.com/api/v3/coins/${data.symbol?.toLowerCase()}`,
                   url: `https://coingecko.com/en/coins/${data.name?.toLowerCase()}`,
                   color: getSourceColor("coingecko"),
                 }
@@ -66,7 +79,9 @@ interface InfoRowProps {
   source?: {
     name: string
     url?: string
+    apiEndpoint?: string
     color?: string
+    formula?: string
   }
   highlighted?: boolean
 }

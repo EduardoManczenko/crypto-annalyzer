@@ -90,13 +90,21 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
                 <td className="py-3 px-4 font-mono text-foreground text-right">
                   <DataValue
                     value={item.quantity}
-                    source={{ name: "CoinGecko", color: getSourceColor("coingecko") }}
+                    source={{
+                      name: "CoinGecko",
+                      apiEndpoint: `https://api.coingecko.com/api/v3/coins/${data.symbol?.toLowerCase()}`,
+                      color: getSourceColor("coingecko")
+                    }}
                   />
                 </td>
                 <td className="py-3 px-4 font-mono text-accent text-right font-semibold">
                   <DataValue
                     value={item.percentage}
-                    source={{ name: "Análise Interna", color: getSourceColor("unknown") }}
+                    source={{
+                      name: "Análise Interna",
+                      formula: "(Supply Atual ÷ Max Supply) × 100",
+                      color: getSourceColor("unknown")
+                    }}
                   />
                 </td>
               </tr>

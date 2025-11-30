@@ -42,7 +42,12 @@ export function TvlDistribution({ data }: TvlDistributionProps) {
               <span className="text-sm font-semibold font-mono text-accent">
                 <DataValue
                   value={`${formatNumber(item.tvl)} (${item.percentage})`}
-                  source={{ name: "DeFiLlama", url: "https://defillama.com", color: getSourceColor("defillama") }}
+                  source={{
+                    name: "DeFiLlama",
+                    apiEndpoint: `https://api.llama.fi/protocol/${data.name?.toLowerCase()}`,
+                    url: `https://defillama.com/protocol/${data.name?.toLowerCase()}`,
+                    color: getSourceColor("defillama")
+                  }}
                 />
               </span>
             </div>
