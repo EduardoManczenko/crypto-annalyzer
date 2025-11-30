@@ -27,6 +27,47 @@ const axiosInstance = axios.create({
 });
 
 /**
+ * Helper: Extrai chainTvls filtrados (sem borrowed, staking, pool2)
+ */
+function extractChainTvls(defiData: any): Record<string, number> | null {
+  if (!defiData) return null;
+
+  // Tentar pegar de currentChainTvls primeiro (dados mais recentes)
+  const chainTvls = defiData.currentChainTvls || defiData.chainTvls;
+
+  if (!chainTvls || typeof chainTvls !== 'object') {
+    return null;
+  }
+
+  // Filtrar apenas chains "puras" (sem sufixos -borrowed, -staking, -pool2)
+  // e excluir agregados (staking, pool2, borrowed)
+  const filteredChains: Record<string, number> = {};
+
+  Object.entries(chainTvls).forEach(([chain, value]) => {
+    // Ignorar se não for número ou se for um array (histórico)
+    if (typeof value !== 'number') return;
+
+    // Ignorar chains com sufixos especiais
+    if (chain.includes('-borrowed') ||
+        chain.includes('-staking') ||
+        chain.includes('-pool2')) {
+      return;
+    }
+
+    // Ignorar agregados globais
+    if (chain === 'staking' ||
+        chain === 'pool2' ||
+        chain === 'borrowed') {
+      return;
+    }
+
+    filteredChains[chain] = value;
+  });
+
+  return Object.keys(filteredChains).length > 0 ? filteredChains : null;
+}
+
+/**
  * Helper: Calcula o TVL total a partir dos dados do DeFiLlama
  */
 function extractTVL(defiData: any): number | null {
@@ -41,15 +82,21 @@ function extractTVL(defiData: any): number | null {
     }
   }
 
-  // Método 2: Somar todos os chainTvls
-  if (defiData.chainTvls && typeof defiData.chainTvls === 'object') {
-    const totalTvl = Object.values(defiData.chainTvls).reduce((sum: number, tvl: any) => {
-      return sum + (typeof tvl === 'number' ? tvl : 0);
-    }, 0);
+  // Método 2: Somar chains filtradas (SEM -borrowed, -staking, -pool2)
+  const chains = extractChainTvls(defiData);
+  if (chains) {
+    const totalTvl = Object.values(chains).reduce((sum, tvl) => sum + tvl, 0);
 
     if (totalTvl > 0) {
-      console.log('[TVL] Calculado somando chainTvls:', totalTvl);
-      console.log('[TVL] Chains:', Object.keys(defiData.chainTvls).length);
+      console.log('[TVL] Calculado somando chains filtradas:', totalTvl);
+      console.log('[TVL] Chains incluídas:', Object.keys(chains).length);
+      console.log('[TVL] Top 5 chains:',
+        Object.entries(chains)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 5)
+          .map(([name, tvl]) => `${name}: $${(tvl / 1e9).toFixed(2)}B`)
+          .join(', ')
+      );
       return totalTvl;
     }
   }
@@ -175,8 +222,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Extrair TVL corretamente
+    // Extrair TVL e chains corretamente
     const tvl = extractTVL(defiData);
+    const chains = extractChainTvls(defiData);
 
     // Consolidar dados
     const data: CryptoData = {
@@ -200,7 +248,7 @@ export async function GET(request: NextRequest) {
         '7d': coinData?.market_data?.price_change_percentage_7d || null,
         '30d': coinData?.market_data?.price_change_percentage_30d || null,
       },
-      chains: defiData?.chainTvls || null,
+      chains,
       category: defiData?.category || coinData?.categories?.[0] || 'N/A',
     };
 
