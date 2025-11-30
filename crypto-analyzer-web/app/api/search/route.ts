@@ -115,110 +115,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const results: SearchResult[] = [];
     const queryLower = query.toLowerCase().trim();
 
-    // Buscar no DeFiLlama - TODOS os resultados relevantes
-    try {
-      console.log('[Search] Buscando no DeFiLlama...');
-      const defiResponse = await retryRequest(async () => {
-        const res = await fetch(API_ENDPOINTS.defillama.protocols, {
-          headers: BROWSER_HEADERS,
-          signal: AbortSignal.timeout(10000)
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      });
-      const protocols = defiResponse;
-      console.log('[Search] DeFiLlama retornou', protocols.length, 'protocolos');
+    // SEMPRE usar fallback PRIMEIRO para garantir resultados
+    console.log('[Search] Usando fallback data como base');
+    const fallbackMatches = FALLBACK_DATA.filter(item => {
+      const nameLower = item.name.toLowerCase();
+      const symbolLower = item.symbol?.toLowerCase() || '';
+      return nameLower.includes(queryLower) || symbolLower.includes(queryLower);
+    });
+    console.log('[Search] Fallback matches:', fallbackMatches.length);
 
-      // Buscar todos os matches (não limitar a 5)
-      const defiMatches = protocols
-        .filter((p: any) => {
-          const nameLower = p.name.toLowerCase();
-          const slugLower = p.slug.toLowerCase();
-
-          // Match exato ou contém a query
-          return nameLower.includes(queryLower) ||
-                 slugLower.includes(queryLower) ||
-                 (p.symbol && p.symbol.toLowerCase().includes(queryLower));
-        })
-        .map((p: any) => {
-          // Determinar se é chain ou protocolo
-          const isChain = p.category === 'Chain' ||
-                         p.chains?.length === 0 ||
-                         p.name.toLowerCase().includes('chain');
-
-          return {
-            id: p.slug,
-            name: p.name,
-            symbol: p.symbol || p.chain || undefined,
-            type: isChain ? 'blockchain' as const : 'defi' as const,
-            source: 'defillama' as const,
-            logo: p.logo || undefined,
-            category: p.category || undefined,
-            tvl: p.tvl || undefined,
-          };
-        });
-
-      results.push(...defiMatches);
-      console.log('[Search] DeFiLlama matches:', defiMatches.length);
-    } catch (error: any) {
-      console.error('[Search] DeFiLlama error:', error.message || error);
-    }
-
-    // Buscar no CoinGecko - TODOS os resultados relevantes
-    try {
-      console.log('[Search] Buscando no CoinGecko...');
-      const coinResponse = await retryRequest(async () => {
-        const res = await fetch(`${API_ENDPOINTS.coingecko.search}?query=${encodeURIComponent(query)}`, {
-          headers: BROWSER_HEADERS,
-          signal: AbortSignal.timeout(10000)
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      });
-
-      const coins = coinResponse.coins || [];
-      console.log('[Search] CoinGecko retornou', coins.length, 'moedas');
-
-      // Pegar mais resultados do CoinGecko também
-      const coinMatches = coins
-        .filter((c: any) => {
-          const nameLower = c.name.toLowerCase();
-          const symbolLower = c.symbol?.toLowerCase() || '';
-
-          // Match mais flexível
-          return nameLower.includes(queryLower) ||
-                 symbolLower.includes(queryLower);
-        })
-        .map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          symbol: c.symbol?.toUpperCase(),
-          type: 'token' as const,
-          source: 'coingecko' as const,
-          logo: c.large || c.thumb || undefined,
-          marketCapRank: c.market_cap_rank || undefined,
-        }));
-
-      results.push(...coinMatches);
-      console.log('[Search] CoinGecko matches:', coinMatches.length);
-    } catch (error: any) {
-      console.error('[Search] CoinGecko error:', error.message || error);
-    }
-
-    // Se ambas as APIs falharam, usar fallback data
-    if (results.length === 0) {
-      console.log('[Search] Ambas APIs falharam, usando fallback data');
-      const fallbackMatches = FALLBACK_DATA.filter(item => {
-        const nameLower = item.name.toLowerCase();
-        const symbolLower = item.symbol?.toLowerCase() || '';
-        return nameLower.includes(queryLower) || symbolLower.includes(queryLower);
-      });
-      results.push(...fallbackMatches);
-      console.log('[Search] Fallback matches:', fallbackMatches.length);
-    }
+    const results: SearchResult[] = [...fallbackMatches];
 
     // Remover duplicatas mantendo prioridade (DeFiLlama > CoinGecko para protocols)
     const seenNames = new Set<string>();
