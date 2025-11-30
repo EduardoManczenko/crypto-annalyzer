@@ -1,14 +1,67 @@
 'use client';
 
-import { AnalysisReport } from '@/types';
+import { AnalysisReport, DataSource } from '@/types';
 import { formatNumber, formatPercent, formatLargeNumber, getMarketCapCategory } from '@/utils/formatters';
+import { sectionTooltips, fieldTooltips, getSourceName, getSourceColor } from '@/utils/tooltips';
+import Tooltip from './Tooltip';
 
 interface ReportProps {
   report: AnalysisReport;
 }
 
+// Componente para ícone de informação
+function InfoIcon({ tooltip }: { tooltip: string }) {
+  return (
+    <Tooltip content={tooltip} position="top">
+      <svg className="w-5 h-5 text-slate-400 hover:text-cyan-400 transition-colors cursor-help inline-block ml-2" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+      </svg>
+    </Tooltip>
+  );
+}
+
 export default function Report({ report }: ReportProps) {
   const { data, riskAnalysis, riskScore } = report;
+
+  // Função para obter fonte de um campo
+  const getFieldSource = (fieldName: string): DataSource | null => {
+    if (!data.sources) return null;
+    return data.sources.find(s => s.field === fieldName) || null;
+  };
+
+  // Componente para tooltip de fonte nos valores
+  const ValueWithSource = ({ value, field, children }: { value: any; field: string; children: React.ReactNode }) => {
+    const source = getFieldSource(field);
+
+    if (!source || value === null || value === 'N/A') {
+      return <>{children}</>;
+    }
+
+    const tooltipContent = (
+      <div className="text-center">
+        <div className="font-semibold mb-1">Fonte dos dados</div>
+        <div className={getSourceColor(source.source)}>{getSourceName(source.source)}</div>
+        {source.url && (
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-cyan-400 hover:text-cyan-300 mt-1 block"
+          >
+            Ver fonte →
+          </a>
+        )}
+      </div>
+    );
+
+    return (
+      <Tooltip content={tooltipContent} position="top">
+        <span className="cursor-help border-b border-dotted border-slate-600 hover:border-cyan-500 transition-colors">
+          {children}
+        </span>
+      </Tooltip>
+    );
+  };
 
   const getPercentColor = (num: number | null) => {
     if (num === null) return 'text-slate-400';
@@ -49,35 +102,57 @@ export default function Report({ report }: ReportProps) {
 
       {/* Informações Básicas */}
       <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-xl font-bold mb-4 text-cyan-400">📊 Informações Básicas</h2>
+        <h2 className="text-xl font-bold mb-4 text-cyan-400 flex items-center">
+          📊 Informações Básicas
+          <InfoIcon tooltip={sectionTooltips.basicInfo} />
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
-            <span className="text-slate-300">Nome</span>
-            <span className="font-semibold">{data.name}</span>
+            <Tooltip content={fieldTooltips.name}>
+              <span className="text-slate-300 cursor-help border-b border-dotted border-slate-600">Nome</span>
+            </Tooltip>
+            <ValueWithSource value={data.name} field="name">
+              <span className="font-semibold">{data.name}</span>
+            </ValueWithSource>
           </div>
           <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
-            <span className="text-slate-300">Símbolo</span>
+            <Tooltip content={fieldTooltips.symbol}>
+              <span className="text-slate-300 cursor-help border-b border-dotted border-slate-600">Símbolo</span>
+            </Tooltip>
             <span className="font-semibold">{data.symbol}</span>
           </div>
           <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
-            <span className="text-slate-300">Categoria</span>
+            <Tooltip content={fieldTooltips.category}>
+              <span className="text-slate-300 cursor-help border-b border-dotted border-slate-600">Categoria</span>
+            </Tooltip>
             <span className="font-semibold">{data.category}</span>
           </div>
           <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
-            <span className="text-slate-300">Preço Atual</span>
-            <span className="font-semibold text-green-400">{formatNumber(data.price)}</span>
+            <Tooltip content={fieldTooltips.price}>
+              <span className="text-slate-300 cursor-help border-b border-dotted border-slate-600">Preço Atual</span>
+            </Tooltip>
+            <ValueWithSource value={data.price} field="price">
+              <span className="font-semibold text-green-400">{formatNumber(data.price)}</span>
+            </ValueWithSource>
           </div>
         </div>
       </div>
 
       {/* Métricas de Mercado */}
       <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-xl font-bold mb-4 text-cyan-400">💰 Métricas de Mercado</h2>
+        <h2 className="text-xl font-bold mb-4 text-cyan-400 flex items-center">
+          💰 Métricas de Mercado
+          <InfoIcon tooltip={sectionTooltips.marketMetrics} />
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {data.marketCap && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">Market Cap</p>
-              <p className="text-xl font-bold">{formatNumber(data.marketCap)}</p>
+              <Tooltip content={fieldTooltips.marketCap}>
+                <p className="text-sm text-slate-400 mb-1 cursor-help border-b border-dotted border-slate-600 inline-block">Market Cap</p>
+              </Tooltip>
+              <ValueWithSource value={data.marketCap} field="marketCap">
+                <p className="text-xl font-bold">{formatNumber(data.marketCap)}</p>
+              </ValueWithSource>
               <p className={`text-sm mt-1 ${getMarketCapCategory(data.marketCap).color === 'green' ? 'text-green-400' : getMarketCapCategory(data.marketCap).color === 'yellow' ? 'text-yellow-400' : 'text-red-400'}`}>
                 {getMarketCapCategory(data.marketCap).category}
               </p>
@@ -85,20 +160,32 @@ export default function Report({ report }: ReportProps) {
           )}
           {data.fdv && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">FDV (Full Diluted)</p>
-              <p className="text-xl font-bold">{formatNumber(data.fdv)}</p>
+              <Tooltip content={fieldTooltips.fdv}>
+                <p className="text-sm text-slate-400 mb-1 cursor-help border-b border-dotted border-slate-600 inline-block">FDV (Full Diluted)</p>
+              </Tooltip>
+              <ValueWithSource value={data.fdv} field="fdv">
+                <p className="text-xl font-bold">{formatNumber(data.fdv)}</p>
+              </ValueWithSource>
             </div>
           )}
           {data.volume24h && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">Volume 24h</p>
-              <p className="text-xl font-bold">{formatNumber(data.volume24h)}</p>
+              <Tooltip content={fieldTooltips.volume24h}>
+                <p className="text-sm text-slate-400 mb-1 cursor-help border-b border-dotted border-slate-600 inline-block">Volume 24h</p>
+              </Tooltip>
+              <ValueWithSource value={data.volume24h} field="volume24h">
+                <p className="text-xl font-bold">{formatNumber(data.volume24h)}</p>
+              </ValueWithSource>
             </div>
           )}
           {data.tvl && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">TVL</p>
-              <p className="text-xl font-bold text-cyan-400">{formatNumber(data.tvl)}</p>
+              <Tooltip content={fieldTooltips.tvl}>
+                <p className="text-sm text-slate-400 mb-1 cursor-help border-b border-dotted border-slate-600 inline-block">TVL</p>
+              </Tooltip>
+              <ValueWithSource value={data.tvl} field="tvl">
+                <p className="text-xl font-bold text-cyan-400">{formatNumber(data.tvl)}</p>
+              </ValueWithSource>
             </div>
           )}
         </div>
@@ -107,7 +194,10 @@ export default function Report({ report }: ReportProps) {
       {/* Supply Analysis */}
       {(data.circulating || data.total || data.max) && (
         <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-bold mb-4 text-cyan-400">📦 Análise de Supply</h2>
+          <h2 className="text-xl font-bold mb-4 text-cyan-400 flex items-center">
+            📦 Análise de Supply
+            <InfoIcon tooltip={sectionTooltips.supplyAnalysis} />
+          </h2>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -120,26 +210,54 @@ export default function Report({ report }: ReportProps) {
               <tbody className="divide-y divide-slate-700">
                 {data.circulating && (
                   <tr>
-                    <td className="py-3 px-4">Circulating Supply</td>
-                    <td className="py-3 px-4 text-right font-mono">{formatLargeNumber(data.circulating)}</td>
+                    <td className="py-3 px-4">
+                      <Tooltip content={fieldTooltips.circulating}>
+                        <span className="cursor-help border-b border-dotted border-slate-600">Circulating Supply</span>
+                      </Tooltip>
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono">
+                      <ValueWithSource value={data.circulating} field="circulating">
+                        {formatLargeNumber(data.circulating)}
+                      </ValueWithSource>
+                    </td>
                     <td className="py-3 px-4 text-right">{safePercent(data.circulating, data.max)}%</td>
                   </tr>
                 )}
                 {data.total && (
                   <tr>
-                    <td className="py-3 px-4">Total Supply</td>
-                    <td className="py-3 px-4 text-right font-mono">{formatLargeNumber(data.total)}</td>
+                    <td className="py-3 px-4">
+                      <Tooltip content={fieldTooltips.totalSupply}>
+                        <span className="cursor-help border-b border-dotted border-slate-600">Total Supply</span>
+                      </Tooltip>
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono">
+                      <ValueWithSource value={data.total} field="total">
+                        {formatLargeNumber(data.total)}
+                      </ValueWithSource>
+                    </td>
                     <td className="py-3 px-4 text-right">{safePercent(data.total, data.max)}%</td>
                   </tr>
                 )}
                 <tr>
-                  <td className="py-3 px-4">Max Supply</td>
-                  <td className="py-3 px-4 text-right font-mono">{data.max ? formatLargeNumber(data.max) : <span className="text-yellow-400">∞ Infinito</span>}</td>
+                  <td className="py-3 px-4">
+                    <Tooltip content={fieldTooltips.maxSupply}>
+                      <span className="cursor-help border-b border-dotted border-slate-600">Max Supply</span>
+                    </Tooltip>
+                  </td>
+                  <td className="py-3 px-4 text-right font-mono">
+                    <ValueWithSource value={data.max} field="max">
+                      {data.max ? formatLargeNumber(data.max) : <span className="text-yellow-400">∞ Infinito</span>}
+                    </ValueWithSource>
+                  </td>
                   <td className="py-3 px-4 text-right">100%</td>
                 </tr>
                 {data.total && data.circulating && (
                   <tr>
-                    <td className="py-3 px-4">Tokens Locked</td>
+                    <td className="py-3 px-4">
+                      <Tooltip content={fieldTooltips.tokensLocked}>
+                        <span className="cursor-help border-b border-dotted border-slate-600">Tokens Locked</span>
+                      </Tooltip>
+                    </td>
                     <td className="py-3 px-4 text-right font-mono">
                       {formatLargeNumber(data.total - data.circulating)}
                     </td>
@@ -160,7 +278,10 @@ export default function Report({ report }: ReportProps) {
 
       {/* Variações */}
       <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-xl font-bold mb-4 text-cyan-400">📈 Variações (Performance)</h2>
+        <h2 className="text-xl font-bold mb-4 text-cyan-400 flex items-center">
+          📈 Variações (Performance)
+          <InfoIcon tooltip={sectionTooltips.performanceVariations} />
+        </h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -206,7 +327,10 @@ export default function Report({ report }: ReportProps) {
       {/* Distribuição por Chain */}
       {data.chains && Object.keys(data.chains).length > 0 && (
         <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-bold mb-4 text-cyan-400">🔗 Distribuição de TVL por Blockchain</h2>
+          <h2 className="text-xl font-bold mb-4 text-cyan-400 flex items-center">
+            🔗 Distribuição de TVL por Blockchain
+            <InfoIcon tooltip={sectionTooltips.chainDistribution} />
+          </h2>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -239,11 +363,16 @@ export default function Report({ report }: ReportProps) {
 
       {/* Ratios */}
       <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-xl font-bold mb-4 text-cyan-400">🧮 Ratios e Métricas Avançadas</h2>
+        <h2 className="text-xl font-bold mb-4 text-cyan-400 flex items-center">
+          🧮 Ratios e Métricas Avançadas
+          <InfoIcon tooltip={sectionTooltips.advancedRatios} />
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {data.fdv && data.marketCap && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">FDV/Market Cap</p>
+              <Tooltip content={fieldTooltips.fdvMcapRatio}>
+                <p className="text-sm text-slate-400 mb-1 cursor-help border-b border-dotted border-slate-600 inline-block">FDV/Market Cap</p>
+              </Tooltip>
               <p className="text-xl font-bold">{safeToFixed(data.fdv / data.marketCap, 2)}x</p>
               <p className={`text-sm mt-1 ${(data.fdv / data.marketCap) < 1.5 ? 'text-green-400' : (data.fdv / data.marketCap) < 3 ? 'text-yellow-400' : 'text-red-400'}`}>
                 {(data.fdv / data.marketCap) < 1.5 ? 'Ótimo' : (data.fdv / data.marketCap) < 3 ? 'Razoável' : 'Alto Risco'}
@@ -252,7 +381,9 @@ export default function Report({ report }: ReportProps) {
           )}
           {data.marketCap && data.tvl && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">MCap/TVL</p>
+              <Tooltip content={fieldTooltips.mcapTvlRatio}>
+                <p className="text-sm text-slate-400 mb-1 cursor-help border-b border-dotted border-slate-600 inline-block">MCap/TVL</p>
+              </Tooltip>
               <p className="text-xl font-bold">{safeToFixed(data.marketCap / data.tvl, 2)}</p>
               <p className={`text-sm mt-1 ${(data.marketCap / data.tvl) < 0.5 ? 'text-green-400' : (data.marketCap / data.tvl) < 2 ? 'text-yellow-400' : 'text-red-400'}`}>
                 {(data.marketCap / data.tvl) < 0.5 ? 'Subvalorizado' : (data.marketCap / data.tvl) < 2 ? 'Justo' : 'Sobrevalorizado'}
@@ -261,7 +392,9 @@ export default function Report({ report }: ReportProps) {
           )}
           {data.volume24h && data.marketCap && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">Volume/MCap 24h</p>
+              <Tooltip content={fieldTooltips.volumeToMcap}>
+                <p className="text-sm text-slate-400 mb-1 cursor-help border-b border-dotted border-slate-600 inline-block">Volume/MCap 24h</p>
+              </Tooltip>
               <p className="text-xl font-bold">{safePercent(data.volume24h, data.marketCap, 2)}%</p>
               <p className={`text-sm mt-1 ${((data.volume24h / data.marketCap) * 100) < 1 ? 'text-red-400' : ((data.volume24h / data.marketCap) * 100) < 10 ? 'text-yellow-400' : 'text-green-400'}`}>
                 {((data.volume24h / data.marketCap) * 100) < 1 ? 'Liquidez Baixa' : ((data.volume24h / data.marketCap) * 100) < 10 ? 'Liquidez Média' : 'Alta Liquidez'}
@@ -270,7 +403,9 @@ export default function Report({ report }: ReportProps) {
           )}
           {data.circulating && data.total && (
             <div className="p-4 bg-slate-700/50 rounded-lg">
-              <p className="text-sm text-slate-400 mb-1">% em Circulação</p>
+              <Tooltip content={fieldTooltips.circulatingPercent}>
+                <p className="text-sm text-slate-400 mb-1 cursor-help border-b border-dotted border-slate-600 inline-block">% em Circulação</p>
+              </Tooltip>
               <p className="text-xl font-bold">{safePercent(data.circulating, data.total, 1)}%</p>
               <p className={`text-sm mt-1 ${((data.circulating / data.total) * 100) > 70 ? 'text-green-400' : ((data.circulating / data.total) * 100) > 40 ? 'text-yellow-400' : 'text-red-400'}`}>
                 {((data.circulating / data.total) * 100) > 70 ? 'Boa Distribuição' : ((data.circulating / data.total) * 100) > 40 ? 'Moderada' : 'Alta Diluição'}
@@ -316,7 +451,10 @@ export default function Report({ report }: ReportProps) {
 
       {/* Score de Risco */}
       <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-8 border-2 border-cyan-500">
-        <h2 className="text-2xl font-bold mb-6 text-center text-cyan-400">⭐ SCORE DE RISCO GERAL</h2>
+        <h2 className="text-2xl font-bold mb-6 text-center text-cyan-400 flex items-center justify-center">
+          ⭐ SCORE DE RISCO GERAL
+          <InfoIcon tooltip={sectionTooltips.riskScore} />
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">

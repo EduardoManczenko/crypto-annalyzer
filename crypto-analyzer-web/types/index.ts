@@ -1,3 +1,9 @@
+export interface DataSource {
+  field: string;
+  source: 'defillama' | 'coingecko' | 'calculated';
+  url?: string;
+}
+
 export interface CryptoData {
   name: string;
   symbol: string;
@@ -21,6 +27,7 @@ export interface CryptoData {
   };
   chains: Record<string, number> | null;
   category: string;
+  sources?: DataSource[]; // Metadados de fonte dos dados
 }
 
 export interface RiskAnalysis {

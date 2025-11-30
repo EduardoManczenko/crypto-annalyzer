@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SearchForm from '@/components/SearchForm';
 import Report from '@/components/Report';
 import { AnalysisReport } from '@/types';
@@ -9,11 +9,33 @@ export default function Home() {
   const [report, setReport] = useState<AnalysisReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFromCache, setIsFromCache] = useState(false);
+
+  // Listener para carregar do cache
+  useEffect(() => {
+    const handleLoadFromCache = (e: CustomEvent) => {
+      const { query, data } = e.detail;
+      setReport(data);
+      setIsFromCache(true);
+      setError(null);
+
+      // Remover badge de cache após 3 segundos
+      setTimeout(() => {
+        setIsFromCache(false);
+      }, 3000);
+    };
+
+    window.addEventListener('loadFromCache', handleLoadFromCache as EventListener);
+    return () => {
+      window.removeEventListener('loadFromCache', handleLoadFromCache as EventListener);
+    };
+  }, []);
 
   const handleSearch = async (query: string) => {
     setIsLoading(true);
     setError(null);
     setReport(null);
+    setIsFromCache(false);
 
     try {
       const response = await fetch(`/api/analyze?q=${encodeURIComponent(query)}`);
@@ -25,6 +47,10 @@ export default function Home() {
 
       const data = await response.json();
       setReport(data);
+
+      // Salvar no cache
+      const cacheKey = `analysis_${query.toLowerCase()}`;
+      localStorage.setItem(cacheKey, JSON.stringify(data));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
@@ -103,6 +129,18 @@ export default function Home() {
         {/* Report */}
         {report && !isLoading && (
           <div className="animate-fade-in">
+            {isFromCache && (
+              <div className="max-w-6xl mx-auto mb-4">
+                <div className="bg-cyan-500/20 border border-cyan-500 rounded-lg px-4 py-2 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                  <span className="text-cyan-300 text-sm font-medium">
+                    Dados carregados do cache local
+                  </span>
+                </div>
+              </div>
+            )}
             <Report report={report} />
           </div>
         )}
