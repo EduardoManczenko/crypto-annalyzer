@@ -187,34 +187,54 @@ async function searchCoinGecko(query: string) {
  * Busca histórico de preços no CoinGecko
  */
 async function fetchPriceHistory(coinId: string) {
-  try {
-    console.log(`[CoinGecko] Buscando histórico de preços para: ${coinId}`);
+  console.log(`[CoinGecko] Buscando histórico de preços para: ${coinId}`);
 
-    // Buscar dados para diferentes períodos em paralelo
-    const [data1d, data7d, data30d, data365d] = await Promise.all([
-      axiosInstance.get(API_ENDPOINTS.coingecko.marketChart(coinId, 1), { timeout: 10000 }),
-      axiosInstance.get(API_ENDPOINTS.coingecko.marketChart(coinId, 7), { timeout: 10000 }),
-      axiosInstance.get(API_ENDPOINTS.coingecko.marketChart(coinId, 30), { timeout: 10000 }),
-      axiosInstance.get(API_ENDPOINTS.coingecko.marketChart(coinId, 365), { timeout: 10000 }),
-    ]);
+  // Formatar dados para o formato esperado
+  const formatPrices = (prices: any[]) =>
+    prices.map(([timestamp, price]: [number, number]) => ({
+      timestamp,
+      price
+    }));
 
-    // Formatar dados para o formato esperado
-    const formatPrices = (prices: any[]) =>
-      prices.map(([timestamp, price]: [number, number]) => ({
-        timestamp,
-        price
-      }));
+  // Buscar cada período individualmente para que falha em um não afete os outros
+  const fetchPeriod = async (days: number, label: string) => {
+    try {
+      console.log(`[CoinGecko] Buscando ${label}...`);
+      const response = await axiosInstance.get(
+        API_ENDPOINTS.coingecko.marketChart(coinId, days),
+        { timeout: 10000 }
+      );
+      const formatted = formatPrices(response.data.prices || []);
+      console.log(`[CoinGecko] ${label} obtido: ${formatted.length} pontos`);
+      return formatted;
+    } catch (error: any) {
+      console.error(`[CoinGecko] Erro ao buscar ${label}:`, error.message);
+      return [];
+    }
+  };
 
-    return {
-      '24h': formatPrices(data1d.data.prices || []),
-      '7d': formatPrices(data7d.data.prices || []),
-      '30d': formatPrices(data30d.data.prices || []),
-      '365d': formatPrices(data365d.data.prices || []),
-    };
-  } catch (error: any) {
-    console.error('[CoinGecko] Erro ao buscar histórico:', error.message);
+  // Buscar todos os períodos em paralelo, mas com tratamento individual de erros
+  const [data24h, data7d, data30d, data365d] = await Promise.all([
+    fetchPeriod(1, '24h'),
+    fetchPeriod(7, '7d'),
+    fetchPeriod(30, '30d'),
+    fetchPeriod(365, '365d'),
+  ]);
+
+  // Retornar null apenas se NENHUM dado foi obtido
+  const hasAnyData = data24h.length > 0 || data7d.length > 0 || data30d.length > 0 || data365d.length > 0;
+
+  if (!hasAnyData) {
+    console.log('[CoinGecko] Nenhum histórico de preços disponível');
     return null;
   }
+
+  return {
+    '24h': data24h,
+    '7d': data7d,
+    '30d': data30d,
+    '365d': data365d,
+  };
 }
 
 /**
@@ -314,6 +334,14 @@ export async function GET(request: NextRequest) {
       price: data.price,
       marketCap: data.marketCap,
       tvl: data.tvl,
+      tvlChange: data.tvlChange,
+      priceChange: data.priceChange,
+      priceHistory: data.priceHistory ? {
+        '24h': data.priceHistory['24h']?.length || 0,
+        '7d': data.priceHistory['7d']?.length || 0,
+        '30d': data.priceHistory['30d']?.length || 0,
+        '365d': data.priceHistory['365d']?.length || 0,
+      } : null,
       chains: data.chains ? Object.keys(data.chains).length : 0
     });
 

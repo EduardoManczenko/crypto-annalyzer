@@ -26,6 +26,21 @@ const PERIODS: PeriodData[] = [
 ]
 
 export function PerformanceVariations({ data }: PerformanceVariationsProps) {
+  // Debug: verificar dados recebidos
+  console.log('[PerformanceVariations] data:', {
+    symbol: data.symbol,
+    price: data.price,
+    tvl: data.tvl,
+    tvlChange: data.tvlChange,
+    priceChange: data.priceChange,
+    priceHistory: data.priceHistory ? {
+      '24h': data.priceHistory['24h']?.length || 0,
+      '7d': data.priceHistory['7d']?.length || 0,
+      '30d': data.priceHistory['30d']?.length || 0,
+      '365d': data.priceHistory['365d']?.length || 0,
+    } : 'não disponível'
+  })
+
   // Filtrar períodos que têm dados
   const availablePeriods = PERIODS.filter((period) => {
     const hasPrice = data.priceChange[period.priceKey] !== null
