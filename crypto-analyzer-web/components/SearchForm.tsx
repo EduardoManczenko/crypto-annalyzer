@@ -17,6 +17,9 @@ interface SearchResult {
 }
 
 export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
+  // DEBUG: Version timestamp - 2025-11-30T19:30:00
+  console.log('🚀 SearchForm carregado! Timestamp: 2025-11-30T19:30:00');
+
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
