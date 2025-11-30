@@ -48,41 +48,65 @@ export async function GET(request: NextRequest) {
 
   try {
     const results: SearchResult[] = [];
+    const queryLower = query.toLowerCase().trim();
 
-    // Buscar no DeFiLlama
+    // Buscar no DeFiLlama - TODOS os resultados relevantes
     try {
       const defiResponse = await axiosInstance.get(API_ENDPOINTS.defillama.protocols);
       const protocols = defiResponse.data;
 
+      // Buscar todos os matches (não limitar a 5)
       const defiMatches = protocols
-        .filter((p: any) =>
-          p.name.toLowerCase().includes(query.toLowerCase()) ||
-          p.slug.toLowerCase().includes(query.toLowerCase())
-        )
-        .slice(0, 5)
-        .map((p: any) => ({
-          id: p.slug,
-          name: p.name,
-          symbol: p.symbol || undefined,
-          type: 'defi' as const,
-          source: 'defillama' as const,
-          logo: p.logo || undefined,
-        }));
+        .filter((p: any) => {
+          const nameLower = p.name.toLowerCase();
+          const slugLower = p.slug.toLowerCase();
+
+          // Match exato ou contém a query
+          return nameLower.includes(queryLower) ||
+                 slugLower.includes(queryLower) ||
+                 (p.symbol && p.symbol.toLowerCase().includes(queryLower));
+        })
+        .map((p: any) => {
+          // Determinar se é chain ou protocolo
+          const isChain = p.category === 'Chain' ||
+                         p.chains?.length === 0 ||
+                         p.name.toLowerCase().includes('chain');
+
+          return {
+            id: p.slug,
+            name: p.name,
+            symbol: p.symbol || p.chain || undefined,
+            type: isChain ? 'blockchain' as const : 'defi' as const,
+            source: 'defillama' as const,
+            logo: p.logo || undefined,
+            category: p.category || undefined,
+            tvl: p.tvl || undefined,
+          };
+        });
 
       results.push(...defiMatches);
     } catch (error) {
       console.error('[Search] DeFiLlama error:', error);
     }
 
-    // Buscar no CoinGecko
+    // Buscar no CoinGecko - TODOS os resultados relevantes
     try {
       const coinResponse = await axiosInstance.get(API_ENDPOINTS.coingecko.search, {
         params: { query }
       });
 
       const coins = coinResponse.data.coins || [];
+
+      // Pegar mais resultados do CoinGecko também
       const coinMatches = coins
-        .slice(0, 5)
+        .filter((c: any) => {
+          const nameLower = c.name.toLowerCase();
+          const symbolLower = c.symbol?.toLowerCase() || '';
+
+          // Match mais flexível
+          return nameLower.includes(queryLower) ||
+                 symbolLower.includes(queryLower);
+        })
         .map((c: any) => ({
           id: c.id,
           name: c.name,
@@ -90,6 +114,7 @@ export async function GET(request: NextRequest) {
           type: 'token' as const,
           source: 'coingecko' as const,
           logo: c.large || c.thumb || undefined,
+          marketCapRank: c.market_cap_rank || undefined,
         }));
 
       results.push(...coinMatches);
@@ -97,29 +122,58 @@ export async function GET(request: NextRequest) {
       console.error('[Search] CoinGecko error:', error);
     }
 
-    // Remover duplicatas (mesmo nome)
-    const uniqueResults = results.reduce((acc: SearchResult[], current) => {
-      const isDuplicate = acc.some(
-        item => item.name.toLowerCase() === current.name.toLowerCase()
-      );
-      if (!isDuplicate) {
-        acc.push(current);
+    // Remover duplicatas mantendo prioridade (DeFiLlama > CoinGecko para protocols)
+    const seenNames = new Set<string>();
+    const uniqueResults = results.filter(item => {
+      const nameLower = item.name.toLowerCase();
+      if (seenNames.has(nameLower)) {
+        return false;
       }
-      return acc;
-    }, []);
+      seenNames.add(nameLower);
+      return true;
+    });
 
-    // Priorizar resultados exatos
+    // Ordenar resultados por relevância
     const sortedResults = uniqueResults.sort((a, b) => {
-      const aExact = a.name.toLowerCase() === query.toLowerCase();
-      const bExact = b.name.toLowerCase() === query.toLowerCase();
+      const aNameLower = a.name.toLowerCase();
+      const bNameLower = b.name.toLowerCase();
+
+      // 1. Match exato tem prioridade máxima
+      const aExact = aNameLower === queryLower;
+      const bExact = bNameLower === queryLower;
       if (aExact && !bExact) return -1;
       if (!aExact && bExact) return 1;
+
+      // 2. Match no início do nome
+      const aStarts = aNameLower.startsWith(queryLower);
+      const bStarts = bNameLower.startsWith(queryLower);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+
+      // 3. Priorizar blockchains
+      if (a.type === 'blockchain' && b.type !== 'blockchain') return -1;
+      if (a.type !== 'blockchain' && b.type === 'blockchain') return 1;
+
+      // 4. Ordenar por TVL (para DeFi) ou Market Cap Rank (para tokens)
+      if (a.type === 'defi' && b.type === 'defi') {
+        const aTvl = (a as any).tvl || 0;
+        const bTvl = (b as any).tvl || 0;
+        return bTvl - aTvl;
+      }
+
+      if (a.type === 'token' && b.type === 'token') {
+        const aRank = (a as any).marketCapRank || 9999;
+        const bRank = (b as any).marketCapRank || 9999;
+        return aRank - bRank;
+      }
+
       return 0;
     });
 
     return NextResponse.json({
       query,
-      results: sortedResults.slice(0, 10)
+      results: sortedResults.slice(0, 15), // Aumentar para 15 resultados
+      total: sortedResults.length
     }, { headers });
   } catch (error: any) {
     console.error('[Search] Error:', error);

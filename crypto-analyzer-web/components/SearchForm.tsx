@@ -123,17 +123,30 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case 'defi': return 'DeFi Protocol';
+      case 'defi': return 'Protocol';
       case 'token': return 'Token';
-      case 'blockchain': return 'Blockchain';
+      case 'blockchain': return 'Chain';
       default: return type;
+    }
+  };
+
+  const getTypeBadge = (type: string) => {
+    switch (type) {
+      case 'blockchain':
+        return <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded font-semibold">Chain</span>;
+      case 'defi':
+        return <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded font-semibold">Protocol</span>;
+      case 'token':
+        return <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-300 rounded font-semibold">Token</span>;
+      default:
+        return null;
     }
   };
 
   const getSourceBadge = (source: string) => {
     switch (source) {
-      case 'defillama': return <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded">DeFiLlama</span>;
-      case 'coingecko': return <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-300 rounded">CoinGecko</span>;
+      case 'defillama': return <span className="text-xs px-1.5 py-0.5 bg-purple-500/10 text-purple-400 rounded text-[10px]">DeFiLlama</span>;
+      case 'coingecko': return <span className="text-xs px-1.5 py-0.5 bg-green-500/10 text-green-400 rounded text-[10px]">CoinGecko</span>;
       default: return null;
     }
   };
@@ -200,32 +213,64 @@ export default function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
           {/* Dropdown de resultados da busca */}
           {showResults && searchResults.length > 0 && (
-            <div className="absolute top-full mt-2 w-full bg-slate-800 border-2 border-slate-700 rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto">
+            <div className="absolute top-full mt-2 w-full bg-slate-800 border-2 border-cyan-500/30 rounded-xl shadow-2xl z-50 max-h-[500px] overflow-y-auto">
               <div className="p-2">
-                <div className="text-xs text-slate-400 px-3 py-2">
-                  Encontrados {searchResults.length} resultados
+                <div className="text-xs text-slate-400 px-3 py-2 border-b border-slate-700 mb-2">
+                  <span className="font-semibold">{searchResults.length}</span> resultados encontrados
                 </div>
-                {searchResults.map((result) => (
+                {searchResults.map((result, index) => (
                   <button
-                    key={`${result.source}-${result.id}`}
+                    key={`${result.source}-${result.id}-${index}`}
                     onClick={() => {
                       setQuery(result.name);
                       performSearch(result.name);
                     }}
-                    className="w-full flex items-center gap-3 px-3 py-3 hover:bg-slate-700 rounded-lg transition-all text-left"
+                    className="w-full flex items-center gap-3 px-3 py-3 hover:bg-slate-700/70 rounded-lg transition-all text-left group border border-transparent hover:border-cyan-500/30"
                   >
-                    {result.logo && (
-                      <img src={result.logo} alt={result.name} className="w-8 h-8 rounded-full" />
-                    )}
+                    {/* Logo */}
+                    <div className="flex-shrink-0">
+                      {result.logo ? (
+                        <img
+                          src={result.logo}
+                          alt={result.name}
+                          className="w-10 h-10 rounded-full ring-2 ring-slate-700 group-hover:ring-cyan-500/50 transition-all"
+                          onError={(e) => {
+                            // Fallback se a imagem não carregar
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 font-bold ring-2 ring-slate-700 group-hover:ring-cyan-500/50 transition-all">
+                          {result.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold truncate">{result.name}</div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-white truncate group-hover:text-cyan-300 transition-colors">
+                          {result.name}
+                        </span>
+                        {getTypeBadge(result.type)}
+                      </div>
                       <div className="text-sm text-slate-400 flex items-center gap-2">
-                        <span>{result.symbol || 'N/A'}</span>
-                        <span>•</span>
-                        <span className="text-xs text-slate-500">{getTypeLabel(result.type)}</span>
+                        {result.symbol && (
+                          <>
+                            <span className="font-mono text-slate-300">{result.symbol}</span>
+                            <span className="text-slate-600">•</span>
+                          </>
+                        )}
+                        {getSourceBadge(result.source)}
                       </div>
                     </div>
-                    {getSourceBadge(result.source)}
+
+                    {/* Seta de indicação */}
+                    <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </button>
                 ))}
               </div>
