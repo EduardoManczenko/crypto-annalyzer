@@ -1,0 +1,361 @@
+/**
+ * Data Aggregator
+ * Combina dados de múltiplas fontes (DefiLlama, CoinGecko, Web Scraping)
+ * e retorna dados consolidados e validados
+ */
+
+import {
+  searchProtocol,
+  searchChain,
+  extractLatestTVL,
+  extractChainTvls,
+  getProtocolUrl,
+  getProtocolApiUrl,
+  getChainUrl,
+  type DefiLlamaProtocolDetails,
+  type DefiLlamaChain
+} from './defillama-api'
+
+import {
+  scrapeProtocolPage,
+  scrapeChainPage,
+  scrapeWithVariations,
+  type ScrapedProtocolData
+} from './defillama-scraper'
+
+import {
+  searchCoin,
+  fetchPriceHistory,
+  extractCoinId,
+  getCoinUrl,
+  getCoinApiUrl,
+  type CoinGeckoCoinData,
+  type ChartData
+} from './coingecko-api'
+
+export interface AggregatedData {
+  // Informações básicas
+  name: string
+  symbol: string
+  logo?: string
+  category: string
+
+  // Dados de preço (CoinGecko)
+  price: number | null
+  marketCap: number | null
+  fdv: number | null
+  volume24h: number | null
+
+  // Supply (CoinGecko)
+  circulating: number | null
+  total: number | null
+  max: number | null
+
+  // TVL (DefiLlama)
+  tvl: number | null
+  tvlChange: {
+    '1d': number | null
+    '7d': number | null
+    '30d': number | null
+    '365d': number | null
+  }
+
+  // Variações de preço (CoinGecko)
+  priceChange: {
+    '24h': number | null
+    '7d': number | null
+    '30d': number | null
+    '365d': number | null
+  }
+
+  // Histórico de preços (CoinGecko)
+  priceHistory?: ChartData
+
+  // Distribuição por chains (DefiLlama)
+  chains: Record<string, number> | null
+
+  // Metadados de fonte
+  sources: {
+    defiLlama?: {
+      url: string
+      apiUrl: string
+      slug?: string
+      type: 'protocol' | 'chain'
+    }
+    coinGecko?: {
+      url: string
+      apiUrl: string
+      coinId: string
+    }
+    scraped?: boolean
+  }
+}
+
+/**
+ * Calcula mudanças de TVL a partir do histórico
+ */
+function calculateTVLChanges(
+  protocol: DefiLlamaProtocolDetails
+): AggregatedData['tvlChange'] {
+  // Tentar usar valores diretos primeiro
+  if (protocol.change_1d !== undefined || protocol.change_7d !== undefined) {
+    return {
+      '1d': protocol.change_1d ?? null,
+      '7d': protocol.change_7d ?? null,
+      '30d': protocol.change_1m ?? null,
+      '365d': null
+    }
+  }
+
+  // Se não tem valores diretos, tentar calcular do histórico
+  if (Array.isArray(protocol.tvl) && protocol.tvl.length > 1) {
+    const now = Date.now() / 1000
+    const currentTvl = protocol.tvl[protocol.tvl.length - 1]?.totalLiquidityUSD
+
+    if (!currentTvl) {
+      return { '1d': null, '7d': null, '30d': null, '365d': null }
+    }
+
+    const findClosestTvl = (targetTime: number) => {
+      let closest = null
+      let minDiff = Infinity
+
+      for (const item of protocol.tvl as any[]) {
+        const diff = Math.abs(item.date - targetTime)
+        if (diff < minDiff) {
+          minDiff = diff
+          closest = item
+        }
+      }
+
+      return closest?.totalLiquidityUSD
+    }
+
+    const calculate = (oldTvl: number | null) => {
+      if (!oldTvl || oldTvl === 0) return null
+      return ((currentTvl - oldTvl) / oldTvl) * 100
+    }
+
+    return {
+      '1d': calculate(findClosestTvl(now - 86400)),
+      '7d': calculate(findClosestTvl(now - 7 * 86400)),
+      '30d': calculate(findClosestTvl(now - 30 * 86400)),
+      '365d': null
+    }
+  }
+
+  return { '1d': null, '7d': null, '30d': null, '365d': null }
+}
+
+/**
+ * Agrega dados de todas as fontes disponíveis
+ */
+export async function aggregateData(query: string): Promise<AggregatedData | null> {
+  console.log(`\n[Aggregator] ========== Agregando dados para: ${query} ==========`)
+
+  try {
+    // FASE 1: Buscar em TODAS as fontes em paralelo
+    const [defiProtocol, defiChain, coinData] = await Promise.race([
+      Promise.all([
+        searchProtocol(query),
+        searchChain(query),
+        searchCoin(query)
+      ]),
+      new Promise<[null, null, null]>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout global')), 25000)
+      )
+    ])
+
+    console.log('[Aggregator] Resultados iniciais:', {
+      defiProtocol: !!defiProtocol,
+      defiChain: !!defiChain,
+      coinData: !!coinData
+    })
+
+    // Verificar se temos pelo menos uma fonte de dados
+    if (!defiProtocol && !defiChain && !coinData) {
+      console.log('[Aggregator] ✗ Nenhuma fonte retornou dados, tentando scraping...')
+
+      // FALLBACK: Tentar web scraping
+      const scrapedData = await scrapeWithVariations(query)
+
+      if (scrapedData && scrapedData.tvl) {
+        console.log('[Aggregator] ✓ Dados obtidos via scraping')
+
+        return {
+          name: query,
+          symbol: query.toUpperCase(),
+          category: scrapedData.category || 'Unknown',
+          price: null,
+          marketCap: scrapedData.mcap || null,
+          fdv: null,
+          volume24h: null,
+          circulating: null,
+          total: null,
+          max: null,
+          tvl: scrapedData.tvl,
+          tvlChange: {
+            '1d': scrapedData.tvlChange24h,
+            '7d': scrapedData.tvlChange7d,
+            '30d': scrapedData.tvlChange30d,
+            '365d': null
+          },
+          priceChange: {
+            '24h': null,
+            '7d': null,
+            '30d': null,
+            '365d': null
+          },
+          chains: scrapedData.chains || null,
+          sources: {
+            scraped: true
+          }
+        }
+      }
+
+      console.log('[Aggregator] ✗ Nenhum dado encontrado (incluindo scraping)')
+      return null
+    }
+
+    // FASE 2: Determinar tipo de ativo e prioridade
+    let primarySource: 'protocol' | 'chain' | 'coin' = 'coin'
+    let defiData: DefiLlamaProtocolDetails | DefiLlamaChain | null = null
+
+    if (defiProtocol) {
+      primarySource = 'protocol'
+      defiData = defiProtocol
+      console.log('[Aggregator] Fonte primária: DeFi Protocol')
+    } else if (defiChain) {
+      primarySource = 'chain'
+      defiData = defiChain
+      console.log('[Aggregator] Fonte primária: DeFi Chain')
+    } else {
+      primarySource = 'coin'
+      console.log('[Aggregator] Fonte primária: CoinGecko')
+    }
+
+    // FASE 3: Buscar histórico de preços se temos CoinGecko
+    let priceHistory: ChartData | null = null
+    const coinId = extractCoinId(coinData)
+
+    if (coinId) {
+      console.log('[Aggregator] Buscando histórico de preços...')
+      priceHistory = await fetchPriceHistory(coinId)
+
+      if (priceHistory) {
+        console.log('[Aggregator] ✓ Histórico de preços obtido:', {
+          '24h': priceHistory['24h']?.length || 0,
+          '7d': priceHistory['7d']?.length || 0,
+          '30d': priceHistory['30d']?.length || 0,
+          '365d': priceHistory['365d']?.length || 0
+        })
+      }
+    }
+
+    // FASE 4: Extrair TVL (com validação por scraping se necessário)
+    let tvl: number | null = null
+    let tvlChange = { '1d': null, '7d': null, '30d': null, '365d': null } as AggregatedData['tvlChange']
+    let chains: Record<string, number> | null = null
+
+    if (primarySource === 'protocol' && defiProtocol) {
+      tvl = extractLatestTVL(defiProtocol)
+      tvlChange = calculateTVLChanges(defiProtocol)
+      chains = extractChainTvls(defiProtocol)
+
+      // VALIDAÇÃO: Se TVL parece baixo, tentar scraping para confirmar
+      if (tvl && tvl < 1000000) {
+        console.log('[Aggregator] TVL parece baixo, validando com scraping...')
+        const scrapedData = await scrapeProtocolPage(defiProtocol.slug)
+
+        if (scrapedData && scrapedData.tvl && scrapedData.tvl > tvl) {
+          console.log(`[Aggregator] ✓ Scraping retornou TVL maior: $${(scrapedData.tvl / 1e9).toFixed(3)}B vs $${(tvl / 1e9).toFixed(3)}B`)
+          tvl = scrapedData.tvl
+          chains = scrapedData.chains || chains
+        }
+      }
+    } else if (primarySource === 'chain' && defiChain) {
+      tvl = defiChain.tvl || null
+    }
+
+    // FASE 5: Consolidar dados
+    const aggregated: AggregatedData = {
+      name: coinData?.name || defiData?.name || query,
+      symbol: coinData?.symbol?.toUpperCase() || (defiData as any)?.symbol?.toUpperCase() || query.toUpperCase(),
+      logo: coinData?.image?.large || coinData?.image?.small || (defiData as any)?.logo,
+      category: (defiData as any)?.category || coinData?.categories?.[0] || 'Unknown',
+
+      // Preço e mercado (CoinGecko)
+      price: coinData?.market_data?.current_price?.usd || null,
+      marketCap: coinData?.market_data?.market_cap?.usd || (defiData as any)?.mcap || null,
+      fdv: coinData?.market_data?.fully_diluted_valuation?.usd || null,
+      volume24h: coinData?.market_data?.total_volume?.usd || null,
+
+      // Supply (CoinGecko)
+      circulating: coinData?.market_data?.circulating_supply || null,
+      total: coinData?.market_data?.total_supply || null,
+      max: coinData?.market_data?.max_supply || null,
+
+      // TVL (DefiLlama)
+      tvl,
+      tvlChange,
+
+      // Variações de preço (CoinGecko)
+      priceChange: {
+        '24h': coinData?.market_data?.price_change_percentage_24h || null,
+        '7d': coinData?.market_data?.price_change_percentage_7d || null,
+        '30d': coinData?.market_data?.price_change_percentage_30d || null,
+        '365d': coinData?.market_data?.price_change_percentage_1y || null
+      },
+
+      // Histórico
+      priceHistory: priceHistory || undefined,
+
+      // Chains
+      chains,
+
+      // Metadados de fonte
+      sources: {
+        ...(defiProtocol && {
+          defiLlama: {
+            url: getProtocolUrl(defiProtocol.slug),
+            apiUrl: getProtocolApiUrl(defiProtocol.slug),
+            slug: defiProtocol.slug,
+            type: 'protocol' as const
+          }
+        }),
+        ...(defiChain && !defiProtocol && {
+          defiLlama: {
+            url: getChainUrl(defiChain.name),
+            apiUrl: `https://api.llama.fi/v2/chains`,
+            type: 'chain' as const
+          }
+        }),
+        ...(coinId && {
+          coinGecko: {
+            url: getCoinUrl(coinId),
+            apiUrl: getCoinApiUrl(coinId),
+            coinId
+          }
+        })
+      }
+    }
+
+    // Log final
+    console.log('[Aggregator] ========== Dados agregados ==========')
+    console.log('[Aggregator] Nome:', aggregated.name)
+    console.log('[Aggregator] Símbolo:', aggregated.symbol)
+    console.log('[Aggregator] Preço:', aggregated.price ? `$${aggregated.price.toFixed(2)}` : 'N/A')
+    console.log('[Aggregator] Market Cap:', aggregated.marketCap ? `$${(aggregated.marketCap / 1e9).toFixed(2)}B` : 'N/A')
+    console.log('[Aggregator] TVL:', aggregated.tvl ? `$${(aggregated.tvl / 1e9).toFixed(3)}B` : 'N/A')
+    console.log('[Aggregator] TVL Change 24h:', aggregated.tvlChange['1d'] !== null ? `${aggregated.tvlChange['1d'].toFixed(2)}%` : 'N/A')
+    console.log('[Aggregator] Histórico:', priceHistory ? 'Sim' : 'Não')
+    console.log('[Aggregator] Chains:', chains ? Object.keys(chains).length : 0)
+    console.log('[Aggregator] Fontes:', Object.keys(aggregated.sources).join(', '))
+    console.log('[Aggregator] =============================================\n')
+
+    return aggregated
+  } catch (error: any) {
+    console.error('[Aggregator] ERRO:', error.message)
+    return null
+  }
+}

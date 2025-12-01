@@ -3,7 +3,6 @@
  * Indexa protocolos, chains, tokens de múltiplas fontes
  */
 
-import axios from 'axios'
 import { fuzzySearch } from './fuzzy-search'
 
 export interface IndexedItem {
@@ -27,13 +26,36 @@ let cachedIndex: IndexedItem[] | null = null
 let lastIndexUpdate = 0
 const INDEX_TTL = 1000 * 60 * 60 * 6 // 6 horas
 
-const axiosInstance = axios.create({
-  timeout: 30000,
-  headers: {
-    'User-Agent': 'CryptoAnalyzer/2.0',
-    'Accept': 'application/json',
+// Fetch helper
+async function fetchWithTimeout(url: string, timeout = 30000) {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeout)
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+      cache: 'no-store'
+    })
+
+    clearTimeout(id)
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error: any) {
+    clearTimeout(id)
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout')
+    }
+    throw error
   }
-})
+}
 
 /**
  * Busca TODOS os protocolos do DeFiLlama
@@ -41,8 +63,7 @@ const axiosInstance = axios.create({
 async function indexDeFiLlamaProtocols(): Promise<IndexedItem[]> {
   try {
     console.log('[Indexer] Buscando protocolos do DeFiLlama...')
-    const response = await axiosInstance.get('https://api.llama.fi/protocols')
-    const protocols = response.data
+    const protocols = await fetchWithTimeout('https://api.llama.fi/protocols')
 
     console.log(`[Indexer] ✓ ${protocols.length} protocolos encontrados no DeFiLlama`)
 
@@ -75,8 +96,7 @@ async function indexDeFiLlamaProtocols(): Promise<IndexedItem[]> {
 async function indexDeFiLlamaChains(): Promise<IndexedItem[]> {
   try {
     console.log('[Indexer] Buscando chains do DeFiLlama...')
-    const response = await axiosInstance.get('https://api.llama.fi/v2/chains')
-    const chains = response.data
+    const chains = await fetchWithTimeout('https://api.llama.fi/v2/chains')
 
     console.log(`[Indexer] ✓ ${chains.length} chains encontradas no DeFiLlama`)
 
@@ -114,20 +134,11 @@ async function indexCoinGeckoTokens(): Promise<IndexedItem[]> {
 
     for (const page of pages) {
       try {
-        const response = await axiosInstance.get(
-          'https://api.coingecko.com/api/v3/coins/markets',
-          {
-            params: {
-              vs_currency: 'usd',
-              order: 'market_cap_desc',
-              per_page: 250,
-              page,
-              sparkline: false
-            }
-          }
+        const data = await fetchWithTimeout(
+          `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}&sparkline=false`
         )
 
-        const tokens = response.data.map((t: any) => ({
+        const tokens = data.map((t: any) => ({
           id: t.id,
           name: t.name,
           symbol: t.symbol?.toUpperCase(),
@@ -167,11 +178,8 @@ async function indexCoinGeckoTokens(): Promise<IndexedItem[]> {
 async function indexCoinGeckoList(): Promise<IndexedItem[]> {
   try {
     console.log('[Indexer] Buscando lista completa do CoinGecko...')
-    const response = await axiosInstance.get('https://api.coingecko.com/api/v3/coins/list', {
-      params: { include_platform: false }
-    })
+    const coins = await fetchWithTimeout('https://api.coingecko.com/api/v3/coins/list?include_platform=false')
 
-    const coins = response.data
     console.log(`[Indexer] ✓ ${coins.length} coins na lista CoinGecko`)
 
     // Pegar apenas os primeiros 5000 para não sobrecarregar
