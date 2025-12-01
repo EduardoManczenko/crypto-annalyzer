@@ -415,6 +415,7 @@ export async function GET(request: NextRequest) {
     const data: CryptoData = {
       name: coinData?.name || defiData?.name || 'N/A',
       symbol: coinData?.symbol?.toUpperCase() || defiData?.symbol?.toUpperCase() || 'N/A',
+      logo: coinData?.image?.large || coinData?.image?.small || defiData?.logo || undefined,
       price: coinData?.market_data?.current_price?.usd || null,
       marketCap: coinData?.market_data?.market_cap?.usd || defiData?.mcap || null,
       fdv: coinData?.market_data?.fully_diluted_valuation?.usd || null,
