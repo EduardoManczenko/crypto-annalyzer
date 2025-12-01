@@ -5,6 +5,7 @@
 
 import { fuzzySearch } from './fuzzy-search';
 import { httpGet } from './data-sources/http-client';
+import { isChain, isProtocol } from './data-sources/asset-identifier';
 
 export interface IndexedItem {
   id: string
@@ -108,21 +109,28 @@ async function indexCoinGeckoTokens(): Promise<IndexedItem[]> {
           `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}&sparkline=false`
         )
 
-        const tokens = data.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          symbol: t.symbol?.toUpperCase(),
-          type: 'token' as const,
-          source: 'coingecko' as const,
-          logo: t.image,
-          marketCap: t.market_cap,
-          marketCapRank: t.market_cap_rank,
-          aliases: [
-            t.name.toLowerCase(),
-            t.symbol?.toLowerCase(),
-            t.id.toLowerCase()
-          ].filter(Boolean)
-        }))
+        const tokens = data.map((t: any) => {
+          // Verificar se é realmente uma chain
+          const itemType = isChain(t.id) || isChain(t.name) ? 'chain' :
+                          isProtocol(t.id) || isProtocol(t.name) ? 'protocol' :
+                          'token'
+
+          return {
+            id: t.id,
+            name: t.name,
+            symbol: t.symbol?.toUpperCase(),
+            type: itemType as 'chain' | 'protocol' | 'token',
+            source: 'coingecko' as const,
+            logo: t.image,
+            marketCap: t.market_cap,
+            marketCapRank: t.market_cap_rank,
+            aliases: [
+              t.name.toLowerCase(),
+              t.symbol?.toLowerCase(),
+              t.id.toLowerCase()
+            ].filter(Boolean)
+          }
+        })
 
         allTokens.push(...tokens)
         console.log(`[Indexer] ✓ Página ${page}/5 do CoinGecko (${tokens.length} tokens)`)

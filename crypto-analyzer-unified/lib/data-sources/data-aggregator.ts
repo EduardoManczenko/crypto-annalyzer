@@ -33,6 +33,13 @@ import {
   type ChartData
 } from './coingecko-api'
 
+import {
+  identifyAssetType,
+  isChain,
+  isProtocol,
+  normalizeChainName
+} from './asset-identifier'
+
 export interface AggregatedData {
   // Informações básicas
   name: string
@@ -154,7 +161,11 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
   console.log(`\n[Aggregator] ========== Agregando dados para: ${query} ==========`)
 
   try {
-    // FASE 1: Buscar em TODAS as fontes em paralelo
+    // FASE 0: Identificar tipo de ativo
+    const assetType = identifyAssetType(query)
+    console.log(`[Aggregator] Tipo de ativo identificado: ${assetType}`)
+
+    // FASE 1: Buscar em TODAS as fontes em paralelo (com priorização)
     const [defiProtocol, defiChain, coinData] = await Promise.race([
       Promise.all([
         searchProtocol(query),
@@ -281,8 +292,10 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
     const aggregated: AggregatedData = {
       name: coinData?.name || defiData?.name || query,
       symbol: coinData?.symbol?.toUpperCase() || (defiData as any)?.symbol?.toUpperCase() || query.toUpperCase(),
-      logo: coinData?.image?.large || coinData?.image?.small || (defiData as any)?.logo,
-      category: (defiData as any)?.category || coinData?.categories?.[0] || 'Unknown',
+      logo: coinData?.image?.large || coinData?.image?.small || (defiData as any)?.logo || undefined,
+      category: isChain(query) ? 'Chain' :
+                isProtocol(query) ? 'DeFi' :
+                (defiData as any)?.category || coinData?.categories?.[0] || 'Token',
 
       // Preço e mercado (CoinGecko)
       price: coinData?.market_data?.current_price?.usd || null,
