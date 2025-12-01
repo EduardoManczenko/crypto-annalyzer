@@ -6,6 +6,7 @@
 import { resolveAlias } from './known-aliases'
 import { fetchDeFiLlamaProtocol, fetchCoinGecko } from './robust-fetcher'
 import { fetchCryptoCompare, fetchSupplyData, fetchDeFiLlamaExtended } from './data-sources'
+import { findBlockchain } from './blockchain-registry'
 
 export interface AggregatedData {
   // Identificação
@@ -65,16 +66,34 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
 
   const startTime = Date.now()
 
-  // Resolver alias para otimizar buscas
+  // PRIORIDADE 1: Verificar se é uma blockchain conhecida do registry
+  const blockchainEntry = findBlockchain(query)
+  if (blockchainEntry) {
+    console.log(`[AGGREGATOR] 🔗 Blockchain encontrada no registry: ${blockchainEntry.name} (${blockchainEntry.category})`)
+    console.log(`[AGGREGATOR] 📍 Usando slugs oficiais:`)
+    console.log(`   - CoinGecko: ${blockchainEntry.coinGeckoId || 'N/A'}`)
+    console.log(`   - DeFiLlama: ${blockchainEntry.defilllamaSlug || 'N/A'}`)
+  }
+
+  // PRIORIDADE 2: Resolver alias para otimizar buscas
   const alias = resolveAlias(query)
-  const symbol = alias?.symbol || query.toUpperCase()
+  const symbol = alias?.symbol || blockchainEntry?.symbol || query.toUpperCase()
+
+  // Usar slugs oficiais se for blockchain conhecida
+  const defiLlamaQuery = blockchainEntry?.defilllamaSlug || alias?.defiLlamaSlug || query
+  const coinGeckoQuery = blockchainEntry?.coinGeckoId || alias?.coinGeckoId || query
+
+  console.log(`[AGGREGATOR] Query final:`)
+  console.log(`   - DeFiLlama: ${defiLlamaQuery}`)
+  console.log(`   - CoinGecko: ${coinGeckoQuery}`)
+  console.log(`   - Symbol: ${symbol}`)
 
   // FASE 1: Buscar de TODAS as fontes em paralelo
   console.log('\n[FASE 1] Buscando de MÚLTIPLAS fontes...')
 
   const [defiData, coinGeckoData, cryptoCompareData] = await Promise.allSettled([
-    fetchDeFiLlamaProtocol(query),
-    fetchCoinGecko(query),
+    fetchDeFiLlamaProtocol(defiLlamaQuery),  // Usa slug específico
+    fetchCoinGecko(coinGeckoQuery),          // Usa ID específico
     fetchCryptoCompare(symbol)
   ])
 

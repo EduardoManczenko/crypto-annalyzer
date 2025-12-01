@@ -121,8 +121,22 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
   }
 
   const handleResultClick = (result: SearchResult) => {
-    setQuery(result.name)
-    performSearch(result.name)
+    // CRÍTICO: Para blockchains, usar ID exato ao invés do nome
+    // Evita confusão entre "Stellar" (XLM) e "Aquarius Stellar" (AQUA)
+    let searchTerm: string
+
+    if (result.type === 'chain') {
+      // Para chains, SEMPRE usar o ID (slug único)
+      searchTerm = result.id
+      console.log(`[SearchBox] 🔗 Chain selecionada: ${result.name} → usando ID: ${searchTerm}`)
+    } else {
+      // Para protocols/tokens, usar nome ou símbolo
+      searchTerm = result.symbol || result.name
+      console.log(`[SearchBox] 📦 ${result.type} selecionado: ${result.name} → usando: ${searchTerm}`)
+    }
+
+    setQuery(result.name) // Display do nome no input
+    performSearch(searchTerm) // Busca usando o termo correto
   }
 
   const clearHistory = () => {
