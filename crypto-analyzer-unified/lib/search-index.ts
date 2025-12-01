@@ -3,8 +3,9 @@
  * Indexa protocolos, chains, tokens de múltiplas fontes
  */
 
-import axios from 'axios'
-import { fuzzySearch } from './fuzzy-search'
+import { fuzzySearch } from './fuzzy-search';
+import { httpGet } from './data-sources/http-client';
+import { isChain, isProtocol } from './data-sources/asset-identifier';
 
 export interface IndexedItem {
   id: string
@@ -27,22 +28,13 @@ let cachedIndex: IndexedItem[] | null = null
 let lastIndexUpdate = 0
 const INDEX_TTL = 1000 * 60 * 60 * 6 // 6 horas
 
-const axiosInstance = axios.create({
-  timeout: 30000,
-  headers: {
-    'User-Agent': 'CryptoAnalyzer/2.0',
-    'Accept': 'application/json',
-  }
-})
-
 /**
  * Busca TODOS os protocolos do DeFiLlama
  */
 async function indexDeFiLlamaProtocols(): Promise<IndexedItem[]> {
   try {
     console.log('[Indexer] Buscando protocolos do DeFiLlama...')
-    const response = await axiosInstance.get('https://api.llama.fi/protocols')
-    const protocols = response.data
+    const protocols = await httpGet('https://api.llama.fi/protocols')
 
     console.log(`[Indexer] ✓ ${protocols.length} protocolos encontrados no DeFiLlama`)
 
@@ -75,8 +67,7 @@ async function indexDeFiLlamaProtocols(): Promise<IndexedItem[]> {
 async function indexDeFiLlamaChains(): Promise<IndexedItem[]> {
   try {
     console.log('[Indexer] Buscando chains do DeFiLlama...')
-    const response = await axiosInstance.get('https://api.llama.fi/v2/chains')
-    const chains = response.data
+    const chains = await httpGet('https://api.llama.fi/v2/chains')
 
     console.log(`[Indexer] ✓ ${chains.length} chains encontradas no DeFiLlama`)
 
@@ -114,34 +105,32 @@ async function indexCoinGeckoTokens(): Promise<IndexedItem[]> {
 
     for (const page of pages) {
       try {
-        const response = await axiosInstance.get(
-          'https://api.coingecko.com/api/v3/coins/markets',
-          {
-            params: {
-              vs_currency: 'usd',
-              order: 'market_cap_desc',
-              per_page: 250,
-              page,
-              sparkline: false
-            }
-          }
+        const data = await httpGet(
+          `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}&sparkline=false`
         )
 
-        const tokens = response.data.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          symbol: t.symbol?.toUpperCase(),
-          type: 'token' as const,
-          source: 'coingecko' as const,
-          logo: t.image,
-          marketCap: t.market_cap,
-          marketCapRank: t.market_cap_rank,
-          aliases: [
-            t.name.toLowerCase(),
-            t.symbol?.toLowerCase(),
-            t.id.toLowerCase()
-          ].filter(Boolean)
-        }))
+        const tokens = data.map((t: any) => {
+          // Verificar se é realmente uma chain
+          const itemType = isChain(t.id) || isChain(t.name) ? 'chain' :
+                          isProtocol(t.id) || isProtocol(t.name) ? 'protocol' :
+                          'token'
+
+          return {
+            id: t.id,
+            name: t.name,
+            symbol: t.symbol?.toUpperCase(),
+            type: itemType as 'chain' | 'protocol' | 'token',
+            source: 'coingecko' as const,
+            logo: t.image,
+            marketCap: t.market_cap,
+            marketCapRank: t.market_cap_rank,
+            aliases: [
+              t.name.toLowerCase(),
+              t.symbol?.toLowerCase(),
+              t.id.toLowerCase()
+            ].filter(Boolean)
+          }
+        })
 
         allTokens.push(...tokens)
         console.log(`[Indexer] ✓ Página ${page}/5 do CoinGecko (${tokens.length} tokens)`)
@@ -167,11 +156,8 @@ async function indexCoinGeckoTokens(): Promise<IndexedItem[]> {
 async function indexCoinGeckoList(): Promise<IndexedItem[]> {
   try {
     console.log('[Indexer] Buscando lista completa do CoinGecko...')
-    const response = await axiosInstance.get('https://api.coingecko.com/api/v3/coins/list', {
-      params: { include_platform: false }
-    })
+    const coins = await httpGet('https://api.coingecko.com/api/v3/coins/list?include_platform=false')
 
-    const coins = response.data
     console.log(`[Indexer] ✓ ${coins.length} coins na lista CoinGecko`)
 
     // Pegar apenas os primeiros 5000 para não sobrecarregar

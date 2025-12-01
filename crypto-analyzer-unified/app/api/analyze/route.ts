@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { CryptoData, AnalysisReport } from '@/types';
 import { calculateRedFlags, calculateRiskScore } from '@/utils/analyzer';
+import { isChain, isProtocol } from '@/lib/data-sources/asset-identifier';
 
 // Configure runtime (nodejs for better compatibility)
 export const runtime = 'nodejs';
@@ -433,7 +434,10 @@ export async function GET(request: NextRequest) {
       },
       priceHistory: priceHistory || undefined,
       chains,
-      category: defiData?.category || coinData?.categories?.[0] || 'N/A',
+      // Priorizar categoria do DeFiLlama (mais descritiva), depois CoinGecko, depois inferir
+      category: defiData?.category ||
+                coinData?.categories?.[0] ||
+                (isChain(query) ? 'Chain' : isProtocol(query) ? 'DeFi' : 'Token'),
     };
 
     console.log(`[API] Dados consolidados:`, {
