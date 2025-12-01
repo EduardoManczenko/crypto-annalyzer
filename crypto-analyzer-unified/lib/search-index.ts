@@ -1,10 +1,13 @@
 /**
  * Sistema de indexação massivo para crypto
  * Indexa protocolos, chains, tokens de múltiplas fontes
+ * COM CLASSIFICAÇÃO INTELIGENTE AUTOMÁTICA
  */
 
 import axios from 'axios'
 import { fuzzySearch } from './fuzzy-search'
+import { classifyItem, shouldReclassify, ItemType } from './smart-classifier'
+import { BLOCKCHAIN_REGISTRY } from './blockchain-registry'
 
 export interface IndexedItem {
   id: string
@@ -195,58 +198,24 @@ async function indexCoinGeckoList(): Promise<IndexedItem[]> {
 
 /**
  * Adiciona manualmente itens conhecidos importantes
+ * INCLUI TODAS AS BLOCKCHAINS DO REGISTRY para garantir classificação correta
  */
 function getManualEntries(): IndexedItem[] {
-  return [
-    // Berachain (exemplo do usuário)
-    {
-      id: 'berachain',
-      name: 'Berachain',
-      symbol: 'BERA',
-      type: 'chain',
-      source: 'defillama',
-      aliases: ['bera', 'berachain', 'bera chain'],
-      logo: 'https://icons.llama.fi/berachain.jpg'
-    },
-    // Outras chains importantes que podem não estar bem indexadas
-    {
-      id: 'base',
-      name: 'Base',
-      symbol: 'BASE',
-      type: 'chain',
-      source: 'defillama',
-      aliases: ['base', 'base chain', 'coinbase base'],
-      logo: 'https://icons.llama.fi/base.jpg'
-    },
-    {
-      id: 'blast',
-      name: 'Blast',
-      symbol: 'BLAST',
-      type: 'chain',
-      source: 'defillama',
-      aliases: ['blast', 'blast chain'],
-      logo: 'https://icons.llama.fi/blast.jpg'
-    },
-    {
-      id: 'scroll',
-      name: 'Scroll',
-      symbol: 'SCR',
-      type: 'chain',
-      source: 'defillama',
-      aliases: ['scroll', 'scroll chain'],
-      logo: 'https://icons.llama.fi/scroll.jpg'
-    },
-    // Protocolos importantes
-    {
-      id: 'hyperliquid',
-      name: 'Hyperliquid',
-      symbol: 'HYPE',
-      type: 'protocol',
-      source: 'defillama',
-      aliases: ['hyperliquid', 'hyper liquid', 'hype'],
-      logo: 'https://icons.llama.fi/hyperliquid.jpg'
-    }
-  ]
+  // Converter BLOCKCHAIN_REGISTRY para IndexedItems
+  const blockchainEntries: IndexedItem[] = BLOCKCHAIN_REGISTRY.map(chain => ({
+    id: chain.id,
+    name: chain.name,
+    symbol: chain.symbol,
+    type: 'chain' as const,
+    source: 'defillama' as const,
+    aliases: chain.aliases,
+    slug: chain.defilllamaSlug?.toLowerCase(),
+    logo: chain.logo || `https://icons.llama.fi/${chain.id}.jpg`
+  }))
+
+  console.log(`[Indexer] ✓ Adicionando ${blockchainEntries.length} blockchains do BLOCKCHAIN_REGISTRY`)
+
+  return blockchainEntries
 }
 
 /**
@@ -273,15 +242,37 @@ export async function buildSearchIndex(): Promise<IndexedItem[]> {
     ...coinGeckoList
   ]
 
-  // Remover duplicatas (priorizar entries com mais dados)
+  // Remover duplicatas + CLASSIFICAÇÃO INTELIGENTE
   const uniqueItems = new Map<string, IndexedItem>()
+  let reclassifiedCount = 0
 
   for (const item of allItems) {
     const key = item.id.toLowerCase()
     const existing = uniqueItems.get(key)
 
     if (!existing) {
-      uniqueItems.set(key, item)
+      // Classificar item antes de adicionar
+      const classification = classifyItem({
+        id: item.id,
+        name: item.name,
+        symbol: item.symbol,
+        chains: item.chains,
+        category: item.category,
+        tvl: item.tvl,
+        originalType: item.type
+      })
+
+      // Se a classificação é de alta confiança e diferente, usar a nova
+      const finalType = classification.confidence === 'high'
+        ? classification.type as IndexedItem['type']
+        : item.type
+
+      if (finalType !== item.type) {
+        console.log(`[Classifier] 🔄 ${item.name}: ${item.type} → ${finalType} (${classification.reason})`)
+        reclassifiedCount++
+      }
+
+      uniqueItems.set(key, { ...item, type: finalType })
     } else {
       // Mesclar dados, preferindo o que tem mais informação
       const merged = {
@@ -294,9 +285,28 @@ export async function buildSearchIndex(): Promise<IndexedItem[]> {
         category: item.category || existing.category,
         aliases: [...new Set([...(existing.aliases || []), ...(item.aliases || [])])]
       }
+
+      // RECLASSIFICAR com dados completos
+      const reclassification = shouldReclassify(merged.type, {
+        id: merged.id,
+        name: merged.name,
+        symbol: merged.symbol,
+        chains: merged.chains,
+        category: merged.category,
+        tvl: merged.tvl
+      })
+
+      if (reclassification) {
+        console.log(`[Classifier] 🔄 ${merged.name}: ${merged.type} → ${reclassification.newType} (${reclassification.reason})`)
+        merged.type = reclassification.newType as IndexedItem['type']
+        reclassifiedCount++
+      }
+
       uniqueItems.set(key, merged)
     }
   }
+
+  console.log(`[Classifier] ✓ Reclassificados: ${reclassifiedCount} itens`)
 
   const finalIndex = Array.from(uniqueItems.values())
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2)
