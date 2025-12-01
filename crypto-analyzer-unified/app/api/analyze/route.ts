@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CryptoData, AnalysisReport } from '@/types';
 import { calculateRedFlags, calculateRiskScore } from '@/utils/analyzer';
-import {
-  fetchDeFiLlamaProtocol,
-  fetchDeFiLlamaTVLHistory,
-  fetchCoinGecko,
-  fetchCoinGeckoPriceHistory
-} from '@/lib/robust-fetcher';
-import {
-  extractTVL,
-  calculateTVLChanges,
-  extractChainTVLs,
-  calculatePriceChanges
-} from '@/lib/tvl-calculator';
+import { aggregateData } from '@/lib/data-aggregator';
+import { fetchDeFiLlamaTVLHistory, fetchCoinGeckoPriceHistory } from '@/lib/robust-fetcher';
+import { calculateTVLChanges, extractChainTVLs } from '@/lib/tvl-calculator';
 import { cacheCleanup } from '@/lib/persistent-cache';
+import { resolveAlias } from '@/lib/known-aliases';
 
 // Configure runtime
 export const runtime = 'nodejs';
@@ -21,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * Endpoint principal de análise - VERSÃO ULTRA ROBUSTA
+ * Endpoint principal de análise - VERSÃO COM MÚLTIPLAS FONTES
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -42,140 +34,139 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`[API] ANALISANDO: ${query}`);
-    console.log('='.repeat(60));
+    console.log(`\n${'='.repeat(80)}`)
+    console.log(`[API] ANALISANDO (MULTI-SOURCE): ${query}`)
+    console.log('='.repeat(80))
 
     const startTime = Date.now();
 
-    // Cleanup de cache expirado (assíncrono, não bloqueia)
+    // Cleanup de cache (não bloqueia)
     cacheCleanup().catch(() => {});
 
-    // Normalizar query para slug
-    const slug = query.toLowerCase().replace(/\s+/g, '-');
+    // FASE 1: Agregar dados de MÚLTIPLAS fontes
+    console.log('\n[FASE 1] Agregando dados de múltiplas fontes...')
+    const aggregated = await aggregateData(query)
 
-    // FASE 1: Buscar dados básicos em paralelo
-    console.log('\n[FASE 1] Buscando dados básicos...');
-    const [defiData, coinData] = await Promise.all([
-      fetchDeFiLlamaProtocol(slug),
-      fetchCoinGecko(query)
-    ]);
-
-    console.log(`[FASE 1] Resultados - DeFi: ${!!defiData}, Coin: ${!!coinData}`);
-
-    if (!defiData && !coinData) {
-      console.log(`[API] ✗ Nenhum dado encontrado para: ${query}\n`);
+    if (!aggregated) {
+      console.log(`[API] ✗ Nenhum dado encontrado para: ${query}\n`)
       return NextResponse.json(
         { error: 'Nenhum dado encontrado. Verifique o nome e tente novamente.' },
         { status: 404, headers }
       );
     }
 
-    // FASE 2: Buscar dados históricos em paralelo (apenas se temos dados básicos)
-    console.log('\n[FASE 2] Buscando dados históricos...');
-    const [tvlHistory, priceHistory] = await Promise.all([
-      defiData ? fetchDeFiLlamaTVLHistory(slug) : Promise.resolve(null),
-      coinData?._coinId ? fetchCoinGeckoPriceHistory(coinData._coinId) : Promise.resolve(null)
-    ]);
+    console.log(`[FASE 1] ✓ Dados agregados com sucesso`)
 
-    console.log(`[FASE 2] Históricos - TVL: ${tvlHistory ? 'sim' : 'não'}, Preço: ${priceHistory ? 'sim' : 'não'}`);
+    // FASE 2: Buscar dados históricos (se aplicável)
+    console.log('\n[FASE 2] Buscando dados históricos...')
 
-    // FASE 3: Extração e cálculo de métricas
-    console.log('\n[FASE 3] Calculando métricas...');
+    const alias = resolveAlias(query)
+    const slug = query.toLowerCase().replace(/\s+/g, '-')
 
-    // TVL atual
-    const tvl = extractTVL(defiData);
-    console.log(`[FASE 3] TVL extraído: ${tvl ? `$${(tvl / 1e9).toFixed(2)}B` : 'N/A'}`);
+    const [tvlHistory, priceHistory] = await Promise.allSettled([
+      // TVL history apenas se temos DeFiLlama data
+      aggregated.dataSources.defiLlama
+        ? fetchDeFiLlamaTVLHistory(alias?.defiLlamaSlug || slug)
+        : Promise.resolve(null),
 
-    // Variações de TVL (usa histórico se disponível)
-    const tvlChange = calculateTVLChanges(defiData, tvlHistory);
-    console.log(`[FASE 3] Variações de TVL:`, tvlChange);
+      // Price history se temos CoinGecko ID
+      aggregated.dataSources.coinGecko
+        ? fetchCoinGeckoPriceHistory((aggregated as any)._coinId || aggregated.symbol.toLowerCase())
+        : Promise.resolve(null)
+    ])
 
-    // TVL por chain
-    const chains = extractChainTVLs(defiData);
-    console.log(`[FASE 3] Chains: ${chains ? Object.keys(chains).length : 0}`);
+    const tvlHistoryData = tvlHistory.status === 'fulfilled' ? tvlHistory.value : null
+    const priceHistoryData = priceHistory.status === 'fulfilled' ? priceHistory.value : null
 
-    // Preço atual
-    const currentPrice = coinData?.market_data?.current_price?.usd || null;
+    console.log(`[FASE 2] Históricos - TVL: ${tvlHistoryData ? 'sim' : 'não'}, Preço: ${priceHistoryData ? 'sim' : 'não'}`)
 
-    // Variações de preço (da API ou calculadas)
-    let priceChange = {
-      '24h': coinData?.market_data?.price_change_percentage_24h || null,
-      '7d': coinData?.market_data?.price_change_percentage_7d || null,
-      '30d': coinData?.market_data?.price_change_percentage_30d || null,
-      '365d': coinData?.market_data?.price_change_percentage_1y || null,
-    };
+    // FASE 3: Calcular métricas avançadas
+    console.log('\n[FASE 3] Calculando métricas avançadas...')
 
-    // Se não temos variações da API, calcular do histórico
-    if (priceHistory && currentPrice && (!priceChange['24h'] && !priceChange['7d'])) {
-      console.log('[FASE 3] Calculando variações de preço do histórico...');
-      const calculated = calculatePriceChanges(priceHistory, currentPrice);
-      priceChange = {
-        '24h': priceChange['24h'] || calculated['24h'],
-        '7d': priceChange['7d'] || calculated['7d'],
-        '30d': priceChange['30d'] || calculated['30d'],
-        '365d': priceChange['365d'] || calculated['365d'],
-      };
+    // TVL Changes (recalcular com histórico se disponível)
+    let tvlChange = aggregated.tvlChange
+    if (tvlHistoryData) {
+      const calculated = calculateTVLChanges({ tvl: tvlHistoryData }, tvlHistoryData)
+      tvlChange = {
+        '1d': tvlChange['1d'] || calculated['1d'],
+        '7d': tvlChange['7d'] || calculated['7d'],
+        '30d': tvlChange['30d'] || calculated['30d'],
+        '365d': calculated['365d'] // Agora temos 1 ano!
+      }
+      console.log(`[FASE 3] TVL Changes recalculados:`, tvlChange)
     }
 
-    console.log(`[FASE 3] Variações de preço:`, priceChange);
+    // Chains (extrair com filtro)
+    const chains = aggregated.chains ? extractChainTVLs({ currentChainTvls: aggregated.chains }) : null
+    console.log(`[FASE 3] Chains: ${chains ? Object.keys(chains).length : 0}`)
+
+    // Price Changes (calcular do histórico se necessário)
+    let priceChange = aggregated.priceChange
+    if (priceHistoryData && aggregated.price) {
+      // Calcular do histórico se faltar dados
+      const periods = ['24h', '7d', '30d', '365d'] as const
+      for (const period of periods) {
+        if (!priceChange[period] && priceHistoryData[period]?.length > 0) {
+          const firstPrice = priceHistoryData[period][0]?.price
+          if (firstPrice && aggregated.price) {
+            priceChange[period] = ((aggregated.price - firstPrice) / firstPrice) * 100
+          }
+        }
+      }
+      console.log(`[FASE 3] Price Changes:`, priceChange)
+    }
 
     // FASE 4: Consolidar dados finais
-    console.log('\n[FASE 4] Consolidando dados...');
+    console.log('\n[FASE 4] Consolidando dados finais...')
 
     const data: CryptoData = {
-      name: coinData?.name || defiData?.name || query,
-      symbol: coinData?.symbol?.toUpperCase() || defiData?.symbol?.toUpperCase() || 'N/A',
-      logo: coinData?.image?.large || coinData?.image?.small || defiData?.logo || undefined,
-      price: currentPrice,
-      marketCap: coinData?.market_data?.market_cap?.usd || defiData?.mcap || null,
-      fdv: coinData?.market_data?.fully_diluted_valuation?.usd || null,
-      volume24h: coinData?.market_data?.total_volume?.usd || null,
-      circulating: coinData?.market_data?.circulating_supply || null,
-      total: coinData?.market_data?.total_supply || null,
-      max: coinData?.market_data?.max_supply || null,
-      tvl,
+      name: aggregated.name,
+      symbol: aggregated.symbol,
+      logo: aggregated.logo,
+      price: aggregated.price,
+      marketCap: aggregated.marketCap,
+      fdv: aggregated.fdv,
+      volume24h: aggregated.volume24h,
+      circulating: aggregated.circulating,
+      total: aggregated.total,
+      max: aggregated.max,
+      tvl: aggregated.tvl,
       tvlChange,
       priceChange,
-      priceHistory: priceHistory || undefined,
+      priceHistory: priceHistoryData || undefined,
       chains,
-      category: defiData?.category || coinData?.categories?.[0] || 'Crypto',
+      category: aggregated.category,
     };
 
-    // Estatísticas de dados obtidos
-    const dataStats = {
-      name: data.name,
-      symbol: data.symbol,
-      hasLogo: !!data.logo,
-      hasPrice: !!data.price,
-      hasMarketCap: !!data.marketCap,
-      hasFDV: !!data.fdv,
-      hasVolume: !!data.volume24h,
-      hasTVL: !!data.tvl,
-      tvlChanges: Object.entries(data.tvlChange)
-        .filter(([, v]) => v !== null)
-        .map(([k]) => k),
-      priceChanges: Object.entries(data.priceChange)
-        .filter(([, v]) => v !== null)
-        .map(([k]) => k),
-      hasPriceHistory: !!data.priceHistory,
-      hasChains: !!data.chains,
-      chainCount: data.chains ? Object.keys(data.chains).length : 0
-    };
+    // Estatísticas finais
+    const completeness = {
+      total: 14, // Total de campos principais
+      filled: [
+        data.price,
+        data.marketCap,
+        data.fdv,
+        data.volume24h,
+        data.circulating,
+        data.total,
+        data.max,
+        data.tvl,
+        data.logo,
+        data.priceChange['24h'],
+        data.priceChange['7d'],
+        data.tvlChange['1d'],
+        data.tvlChange['7d'],
+        data.chains
+      ].filter(Boolean).length
+    }
 
-    console.log('[FASE 4] Estatísticas de dados:');
-    console.log(`  - Nome: ${dataStats.name} (${dataStats.symbol})`);
-    console.log(`  - Logo: ${dataStats.hasLogo ? 'sim' : 'não'}`);
-    console.log(`  - Preço: ${dataStats.hasPrice ? 'sim' : 'não'}`);
-    console.log(`  - Market Cap: ${dataStats.hasMarketCap ? 'sim' : 'não'}`);
-    console.log(`  - TVL: ${dataStats.hasTVL ? 'sim' : 'não'}`);
-    console.log(`  - Variações TVL: ${dataStats.tvlChanges.join(', ') || 'nenhuma'}`);
-    console.log(`  - Variações Preço: ${dataStats.priceChanges.join(', ') || 'nenhuma'}`);
-    console.log(`  - Histórico preço: ${dataStats.hasPriceHistory ? 'sim' : 'não'}`);
-    console.log(`  - Chains: ${dataStats.chainCount}`);
+    const completenessPercent = ((completeness.filled / completeness.total) * 100).toFixed(1)
+
+    console.log('\n[FASE 4] Cobertura de dados:')
+    console.log(`  Completude: ${completeness.filled}/${completeness.total} (${completenessPercent}%)`)
+    console.log(`  Fontes: ${Object.entries(aggregated.dataSources).filter(([k, v]) => v && k !== 'others').map(([k]) => k).join(', ')}`)
 
     // FASE 5: Análise de risco
-    console.log('\n[FASE 5] Analisando riscos...');
+    console.log('\n[FASE 5] Analisando riscos...')
 
     const riskAnalysis = calculateRedFlags(data);
     const riskScore = calculateRiskScore(
@@ -184,13 +175,9 @@ export async function GET(request: NextRequest) {
       riskAnalysis.positives.length
     );
 
-    console.log(`[FASE 5] Score de risco: ${riskScore.score}/100`);
-    console.log(`  - Flags: ${riskAnalysis.flags.length}`);
-    console.log(`  - Warnings: ${riskAnalysis.warnings.length}`);
-    console.log(`  - Positives: ${riskAnalysis.positives.length}`);
-    console.log(`  - Classificação: ${riskScore.classification}`);
+    console.log(`[FASE 5] Score: ${riskScore.score}/100 (${riskScore.classification})`)
 
-    // Construir relatório final
+    // Relatório final
     const report: AnalysisReport = {
       data,
       riskAnalysis,
@@ -198,19 +185,20 @@ export async function GET(request: NextRequest) {
     };
 
     const elapsed = Date.now() - startTime;
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`[API] ✓ ANÁLISE COMPLETA - ${query} (${elapsed}ms)`);
-    console.log('='.repeat(60) + '\n');
+    console.log(`\n${'='.repeat(80)}`)
+    console.log(`[API] ✓ ANÁLISE COMPLETA - ${query} (${elapsed}ms)`)
+    console.log(`Cobertura: ${completenessPercent}% | Fontes: ${Object.keys(aggregated.dataSources).filter(k => (aggregated.dataSources as any)[k]).length}`)
+    console.log('='.repeat(80) + '\n')
 
     return NextResponse.json(report, { headers });
 
   } catch (error: any) {
-    console.error(`\n${'='.repeat(60)}`);
-    console.error('[API] ✗ ERRO NA ANÁLISE');
-    console.error('='.repeat(60));
-    console.error('Mensagem:', error.message);
-    console.error('Stack:', error.stack);
-    console.error('='.repeat(60) + '\n');
+    console.error(`\n${'='.repeat(80)}`)
+    console.error('[API] ✗ ERRO NA ANÁLISE')
+    console.error('='.repeat(80))
+    console.error('Mensagem:', error.message)
+    console.error('Stack:', error.stack)
+    console.error('='.repeat(80) + '\n')
 
     return NextResponse.json(
       {
