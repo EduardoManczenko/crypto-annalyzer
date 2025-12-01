@@ -3,7 +3,8 @@
  * Indexa protocolos, chains, tokens de múltiplas fontes
  */
 
-import { fuzzySearch } from './fuzzy-search'
+import { fuzzySearch } from './fuzzy-search';
+import { httpGet } from './data-sources/http-client';
 
 export interface IndexedItem {
   id: string
@@ -26,44 +27,13 @@ let cachedIndex: IndexedItem[] | null = null
 let lastIndexUpdate = 0
 const INDEX_TTL = 1000 * 60 * 60 * 6 // 6 horas
 
-// Fetch helper
-async function fetchWithTimeout(url: string, timeout = 30000) {
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-      },
-      cache: 'no-store'
-    })
-
-    clearTimeout(id)
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    return await response.json()
-  } catch (error: any) {
-    clearTimeout(id)
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout')
-    }
-    throw error
-  }
-}
-
 /**
  * Busca TODOS os protocolos do DeFiLlama
  */
 async function indexDeFiLlamaProtocols(): Promise<IndexedItem[]> {
   try {
     console.log('[Indexer] Buscando protocolos do DeFiLlama...')
-    const protocols = await fetchWithTimeout('https://api.llama.fi/protocols')
+    const protocols = await httpGet('https://api.llama.fi/protocols')
 
     console.log(`[Indexer] ✓ ${protocols.length} protocolos encontrados no DeFiLlama`)
 
@@ -96,7 +66,7 @@ async function indexDeFiLlamaProtocols(): Promise<IndexedItem[]> {
 async function indexDeFiLlamaChains(): Promise<IndexedItem[]> {
   try {
     console.log('[Indexer] Buscando chains do DeFiLlama...')
-    const chains = await fetchWithTimeout('https://api.llama.fi/v2/chains')
+    const chains = await httpGet('https://api.llama.fi/v2/chains')
 
     console.log(`[Indexer] ✓ ${chains.length} chains encontradas no DeFiLlama`)
 
@@ -134,7 +104,7 @@ async function indexCoinGeckoTokens(): Promise<IndexedItem[]> {
 
     for (const page of pages) {
       try {
-        const data = await fetchWithTimeout(
+        const data = await httpGet(
           `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}&sparkline=false`
         )
 
@@ -178,7 +148,7 @@ async function indexCoinGeckoTokens(): Promise<IndexedItem[]> {
 async function indexCoinGeckoList(): Promise<IndexedItem[]> {
   try {
     console.log('[Indexer] Buscando lista completa do CoinGecko...')
-    const coins = await fetchWithTimeout('https://api.coingecko.com/api/v3/coins/list?include_platform=false')
+    const coins = await httpGet('https://api.coingecko.com/api/v3/coins/list?include_platform=false')
 
     console.log(`[Indexer] ✓ ${coins.length} coins na lista CoinGecko`)
 

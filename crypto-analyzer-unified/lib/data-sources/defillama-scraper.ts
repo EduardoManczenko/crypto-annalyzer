@@ -4,40 +4,7 @@
  * Faz scraping direto da página HTML do DefiLlama
  */
 
-// Fetch helper para scraping
-async function fetchHTML(url: string, timeout = 20000): Promise<string> {
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
-      },
-      cache: 'no-store'
-    })
-
-    clearTimeout(id)
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    return await response.text()
-  } catch (error: any) {
-    clearTimeout(id)
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout')
-    }
-    throw error
-  }
-}
+import { httpGetHTML } from './http-client';
 
 export interface ScrapedProtocolData {
   tvl: number | null
@@ -102,7 +69,7 @@ export async function scrapeProtocolPage(slug: string): Promise<ScrapedProtocolD
     console.log(`[DefiLlama Scraper] Fazendo scraping de: ${slug}`)
 
     const url = `https://defillama.com/protocol/${slug}`
-    const html = await fetchHTML(url)
+    const html = await httpGetHTML(url, { timeout: 20000 })
 
     console.log(`[DefiLlama Scraper] HTML obtido (${html.length} chars)`)
 
@@ -223,7 +190,7 @@ export async function scrapeChainPage(chainName: string): Promise<ScrapedProtoco
     console.log(`[DefiLlama Scraper] Fazendo scraping da chain: ${chainName}`)
 
     const url = `https://defillama.com/chain/${chainName}`
-    const html = await fetchHTML(url)
+    const html = await httpGetHTML(url, { timeout: 20000 })
 
     console.log(`[DefiLlama Scraper] HTML da chain obtido (${html.length} chars)`)
 

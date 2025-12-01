@@ -3,38 +3,9 @@
  * Responsável por todas as interações com a API do CoinGecko
  */
 
+import { httpGet } from './http-client';
+
 const API_BASE = 'https://api.coingecko.com/api/v3'
-
-// Fetch helper com timeout
-async function fetchWithTimeout(url: string, timeout = 15000) {
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-      },
-      cache: 'no-store'
-    })
-
-    clearTimeout(id)
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    return await response.json()
-  } catch (error: any) {
-    clearTimeout(id)
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout')
-    }
-    throw error
-  }
-}
 
 export interface PricePoint {
   timestamp: number
@@ -95,7 +66,7 @@ export async function searchCoin(query: string): Promise<CoinGeckoCoinData | nul
     console.log(`[CoinGecko API] Buscando: ${query}`)
 
     // Buscar
-    const searchData = await fetchWithTimeout(`${API_BASE}/search?query=${encodeURIComponent(query)}`)
+    const searchData = await httpGet(`${API_BASE}/search?query=${encodeURIComponent(query)}`, { timeout: 15000 })
 
     const coins = searchData.coins
     if (!coins || coins.length === 0) {
@@ -107,8 +78,9 @@ export async function searchCoin(query: string): Promise<CoinGeckoCoinData | nul
     console.log(`[CoinGecko API] Moeda encontrada: ${coin.name} (${coin.id})`)
 
     // Obter detalhes
-    const coinData = await fetchWithTimeout(
-      `${API_BASE}/coins/${coin.id}?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`
+    const coinData = await httpGet(
+      `${API_BASE}/coins/${coin.id}?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`,
+      { timeout: 15000 }
     )
 
     console.log(`[CoinGecko API] ✓ Dados obtidos para ${coin.id}`)
@@ -132,8 +104,9 @@ async function fetchPeriodPrices(
     console.log(`[CoinGecko API] Buscando ${label} para ${coinId}...`)
 
     const interval = days === 1 ? 'hourly' : 'daily'
-    const data = await fetchWithTimeout(
-      `${API_BASE}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=${interval}`
+    const data = await httpGet(
+      `${API_BASE}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=${interval}`,
+      { timeout: 15000 }
     )
 
     const prices = data.prices || []
@@ -199,8 +172,9 @@ export async function fetchMarketData(coinId: string): Promise<CoinGeckoMarketDa
   try {
     console.log(`[CoinGecko API] Buscando dados de mercado para: ${coinId}`)
 
-    const data = await fetchWithTimeout(
-      `${API_BASE}/coins/${coinId}?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`
+    const data = await httpGet(
+      `${API_BASE}/coins/${coinId}?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`,
+      { timeout: 15000 }
     )
 
     const marketData = data.market_data

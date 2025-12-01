@@ -3,38 +3,9 @@
  * Responsável por todas as interações com a API do DefiLlama
  */
 
+import { httpGet } from './http-client';
+
 const API_BASE = 'https://api.llama.fi'
-
-// Fetch helper com timeout
-async function fetchWithTimeout(url: string, timeout = 15000) {
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-      },
-      cache: 'no-store'
-    })
-
-    clearTimeout(id)
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    return await response.json()
-  } catch (error: any) {
-    clearTimeout(id)
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout')
-    }
-    throw error
-  }
-}
 
 export interface DefiLlamaProtocol {
   id: string
@@ -109,7 +80,7 @@ export interface DefiLlamaChain {
 export async function fetchProtocols(): Promise<DefiLlamaProtocol[]> {
   try {
     console.log('[DefiLlama API] Buscando lista de protocolos...')
-    const data = await fetchWithTimeout(`${API_BASE}/protocols`)
+    const data = await httpGet(`${API_BASE}/protocols`, { timeout: 15000 })
     console.log(`[DefiLlama API] ✓ ${data.length} protocolos obtidos`)
     return data
   } catch (error: any) {
@@ -124,7 +95,7 @@ export async function fetchProtocols(): Promise<DefiLlamaProtocol[]> {
 export async function fetchProtocolDetails(slug: string): Promise<DefiLlamaProtocolDetails> {
   try {
     console.log(`[DefiLlama API] Buscando detalhes de: ${slug}`)
-    const data = await fetchWithTimeout(`${API_BASE}/protocol/${slug}`, 10000)
+    const data = await httpGet(`${API_BASE}/protocol/${slug}`, { timeout: 10000 })
     console.log(`[DefiLlama API] ✓ Detalhes obtidos para ${slug}`)
 
     // Log dos dados principais
@@ -151,7 +122,7 @@ export async function fetchProtocolDetails(slug: string): Promise<DefiLlamaProto
 export async function fetchChains(): Promise<DefiLlamaChain[]> {
   try {
     console.log('[DefiLlama API] Buscando lista de chains...')
-    const data = await fetchWithTimeout(`${API_BASE}/v2/chains`)
+    const data = await httpGet(`${API_BASE}/v2/chains`, { timeout: 15000 })
     console.log(`[DefiLlama API] ✓ ${data.length} chains obtidas`)
     return data
   } catch (error: any) {
