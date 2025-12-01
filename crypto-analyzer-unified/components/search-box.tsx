@@ -15,9 +15,11 @@ interface SearchResult {
   id: string
   name: string
   symbol?: string
-  type: 'defi' | 'token' | 'blockchain'
+  type: 'protocol' | 'chain' | 'token' | 'exchange'
   source: 'defillama' | 'coingecko'
   logo?: string
+  tvl?: number
+  marketCap?: number
 }
 
 export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
@@ -130,15 +132,25 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
 
   const getTypeBadge = (type: string) => {
     switch (type) {
-      case 'blockchain':
+      case 'chain':
         return <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded font-semibold">Chain</span>
-      case 'defi':
+      case 'protocol':
         return <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded font-semibold">Protocol</span>
       case 'token':
         return <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-300 rounded font-semibold">Token</span>
+      case 'exchange':
+        return <span className="text-xs px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded font-semibold">Exchange</span>
       default:
         return null
     }
+  }
+
+  const formatMetric = (value: number | undefined) => {
+    if (!value) return null
+    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`
+    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`
+    if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`
+    return `$${value.toFixed(2)}`
   }
 
   return (
@@ -205,9 +217,27 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
                         onClick={() => handleResultClick(result)}
                         className="w-full px-4 py-3 flex items-center gap-3 hover:bg-muted transition-colors text-left group"
                       >
-                        <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-sm">
-                          {result.name.charAt(0).toUpperCase()}
+                        {/* Logo */}
+                        <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden border border-border/50 flex-shrink-0">
+                          {result.logo ? (
+                            <img
+                              src={result.logo}
+                              alt={result.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback se imagem não carregar
+                                e.currentTarget.style.display = 'none'
+                                e.currentTarget.parentElement!.innerHTML = `<span class="text-accent font-bold text-sm">${result.name.charAt(0).toUpperCase()}</span>`
+                              }}
+                            />
+                          ) : (
+                            <span className="text-accent font-bold text-sm">
+                              {result.name.charAt(0).toUpperCase()}
+                            </span>
+                          )}
                         </div>
+
+                        {/* Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <span className="text-sm font-mono font-semibold text-foreground truncate">
@@ -215,9 +245,23 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
                             </span>
                             {getTypeBadge(result.type)}
                           </div>
-                          {result.symbol && (
-                            <span className="text-xs text-muted-foreground font-mono">{result.symbol}</span>
-                          )}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            {result.symbol && (
+                              <span className="font-mono font-semibold">{result.symbol}</span>
+                            )}
+                            {result.tvl && (
+                              <>
+                                <span>•</span>
+                                <span>TVL {formatMetric(result.tvl)}</span>
+                              </>
+                            )}
+                            {result.marketCap && !result.tvl && (
+                              <>
+                                <span>•</span>
+                                <span>MCap {formatMetric(result.marketCap)}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </button>
                     ))}

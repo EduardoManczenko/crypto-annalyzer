@@ -13,6 +13,7 @@ export interface ChartData {
 export interface CryptoData {
   name: string;
   symbol: string;
+  logo?: string;
   price: number | null;
   marketCap: number | null;
   fdv: number | null;

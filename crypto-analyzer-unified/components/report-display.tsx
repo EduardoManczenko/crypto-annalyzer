@@ -23,9 +23,23 @@ export function ReportDisplay({ data }: ReportDisplayProps) {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header with asset name and type */}
       <div className="text-center pb-6 border-b border-border">
-        <h2 className="text-3xl md:text-4xl font-bold mb-2">
-          {cryptoData.name} ({cryptoData.symbol})
-        </h2>
+        <div className="flex items-center justify-center gap-4 mb-4">
+          {cryptoData.logo && (
+            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-accent/30 bg-accent/10 flex items-center justify-center">
+              <img
+                src={cryptoData.logo}
+                alt={cryptoData.name}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            </div>
+          )}
+          <h2 className="text-3xl md:text-4xl font-bold">
+            {cryptoData.name} ({cryptoData.symbol})
+          </h2>
+        </div>
         <p className="text-sm text-muted-foreground font-mono uppercase tracking-wide">
           {cryptoData.category || "Crypto Analysis"}
         </p>
