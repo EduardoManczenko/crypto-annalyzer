@@ -293,9 +293,10 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
       name: coinData?.name || defiData?.name || query,
       symbol: coinData?.symbol?.toUpperCase() || (defiData as any)?.symbol?.toUpperCase() || query.toUpperCase(),
       logo: coinData?.image?.large || coinData?.image?.small || (defiData as any)?.logo || undefined,
-      category: isChain(query) ? 'Chain' :
-                isProtocol(query) ? 'DeFi' :
-                (defiData as any)?.category || coinData?.categories?.[0] || 'Token',
+      // Priorizar categoria do DeFiLlama (mais descritiva), depois CoinGecko, depois inferir pelo tipo
+      category: (defiData as any)?.category ||
+                coinData?.categories?.[0] ||
+                (isChain(query) ? 'Chain' : isProtocol(query) ? 'DeFi' : 'Token'),
 
       // Preço e mercado (CoinGecko)
       price: coinData?.market_data?.current_price?.usd || null,
