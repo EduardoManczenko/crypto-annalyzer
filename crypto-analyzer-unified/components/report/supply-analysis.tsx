@@ -4,7 +4,7 @@ import { InfoIcon } from "../info-icon"
 import { LabelWithTooltip } from "../label-with-tooltip"
 import { DataValue } from "../data-value"
 import { CryptoData } from "@/types"
-import { formatLargeNumber } from "@/utils/formatters"
+import { formatLargeNumber, safeToFixed } from "@/utils/formatters"
 import { sectionTooltips, fieldTooltips, getSourceColor } from "@/lib/tooltips"
 
 interface SupplyAnalysisProps {
@@ -19,7 +19,7 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
       quantity: formatLargeNumber(data.circulating),
       percentage:
         data.circulating && data.max
-          ? `${((data.circulating / data.max) * 100).toFixed(2)}%`
+          ? `${safeToFixed((data.circulating / data.max) * 100, 2)}%`
           : "N/A",
     },
     {
@@ -28,7 +28,7 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
       quantity: formatLargeNumber(data.total),
       percentage:
         data.total && data.max
-          ? `${((data.total / data.max) * 100).toFixed(2)}%`
+          ? `${safeToFixed((data.total / data.max) * 100, 2)}%`
           : "N/A",
     },
     {
@@ -46,7 +46,7 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
           : "N/A",
       percentage:
         data.total && data.circulating && data.max
-          ? `${(((data.total - data.circulating) / data.max) * 100).toFixed(2)}%`
+          ? `${safeToFixed(((data.total - data.circulating) / data.max) * 100, 2)}%`
           : "N/A",
     },
   ]

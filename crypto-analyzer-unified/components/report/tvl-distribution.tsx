@@ -3,7 +3,7 @@ import { NetworkIcon } from "../icons/network-icon"
 import { InfoIcon } from "../info-icon"
 import { DataValue } from "../data-value"
 import { CryptoData } from "@/types"
-import { formatNumber } from "@/utils/formatters"
+import { formatNumber, safeToFixed } from "@/utils/formatters"
 import { sectionTooltips, getSourceColor } from "@/lib/tooltips"
 
 interface TvlDistributionProps {
@@ -19,7 +19,7 @@ export function TvlDistribution({ data }: TvlDistributionProps) {
     .map(([blockchain, tvl]) => ({
       blockchain,
       tvl,
-      percentage: totalTvl > 0 ? ((tvl / totalTvl) * 100).toFixed(2) + "%" : "0%",
+      percentage: totalTvl > 0 ? safeToFixed((tvl / totalTvl) * 100, 2) + "%" : "0%",
       percentageNum: totalTvl > 0 ? (tvl / totalTvl) * 100 : 0,
     }))
     .sort((a, b) => b.tvl - a.tvl)

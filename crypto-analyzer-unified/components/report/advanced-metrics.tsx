@@ -5,6 +5,7 @@ import { LabelWithTooltip } from "../label-with-tooltip"
 import { DataValue } from "../data-value"
 import { CryptoData } from "@/types"
 import { sectionTooltips, getSourceColor } from "@/lib/tooltips"
+import { safeToFixed } from "@/utils/formatters"
 
 interface AdvancedMetricsProps {
   data: CryptoData
@@ -18,7 +19,8 @@ export function AdvancedMetrics({ data }: AdvancedMetricsProps) {
   ): string => {
     if (!numerator || !denominator || denominator === 0) return "N/A"
     const ratio = numerator / denominator
-    return `${ratio.toFixed(2)}${suffix}`
+    const formatted = safeToFixed(ratio, 2)
+    return formatted === 'N/A' ? 'N/A' : `${formatted}${suffix}`
   }
 
   const calculatePercentage = (
@@ -26,7 +28,9 @@ export function AdvancedMetrics({ data }: AdvancedMetricsProps) {
     total: number | null | undefined
   ): string => {
     if (!part || !total || total === 0) return "N/A"
-    return `${((part / total) * 100).toFixed(2)}%`
+    const percentage = (part / total) * 100
+    const formatted = safeToFixed(percentage, 2)
+    return formatted === 'N/A' ? 'N/A' : `${formatted}%`
   }
 
   const metrics = [

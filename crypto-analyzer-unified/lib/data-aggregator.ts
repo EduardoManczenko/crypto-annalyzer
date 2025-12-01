@@ -106,7 +106,9 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
     name: coinGecko?.name || defi?.name || alias?.name || query,
     symbol: coinGecko?.symbol?.toUpperCase() || defi?.symbol?.toUpperCase() || symbol,
     logo: coinGecko?.image?.large || coinGecko?.image?.small || defi?.logo || undefined,
-    category: defi?.category || coinGecko?.categories?.[0] || alias?.type || 'Crypto',
+    // CATEGORY - PRIORIZA ALIAS (manualmente definido) > APIs
+    // Aliases foram criados justamente para resolver casos problemáticos!
+    category: alias?.type ? (alias.type === 'chain' ? 'Chain' : alias.type === 'protocol' ? 'Protocol' : alias.type) : (defi?.category || coinGecko?.categories?.[0] || 'Crypto'),
 
     // PREÇO - Prioriza CoinGecko > CryptoCompare
     price: coinGecko?.market_data?.current_price?.usd || cryptoCompare?.price || null,

@@ -119,18 +119,26 @@ export async function GET(request: NextRequest) {
     // FASE 4: Consolidar dados finais
     console.log('\n[FASE 4] Consolidando dados finais...')
 
+    // Helper para garantir que números sejam do tipo correto
+    const ensureNumber = (value: any): number | null => {
+      if (value === null || value === undefined) return null;
+      const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+      return isNaN(num) || !isFinite(num) ? null : num;
+    }
+
     const data: CryptoData = {
       name: aggregated.name,
       symbol: aggregated.symbol,
       logo: aggregated.logo,
-      price: aggregated.price,
-      marketCap: aggregated.marketCap,
-      fdv: aggregated.fdv,
-      volume24h: aggregated.volume24h,
-      circulating: aggregated.circulating,
-      total: aggregated.total,
-      max: aggregated.max,
-      tvl: aggregated.tvl,
+      // Garantir que todos os números são do tipo number
+      price: ensureNumber(aggregated.price),
+      marketCap: ensureNumber(aggregated.marketCap),
+      fdv: ensureNumber(aggregated.fdv),
+      volume24h: ensureNumber(aggregated.volume24h),
+      circulating: ensureNumber(aggregated.circulating),
+      total: ensureNumber(aggregated.total),
+      max: ensureNumber(aggregated.max),
+      tvl: ensureNumber(aggregated.tvl),
       tvlChange,
       priceChange,
       priceHistory: priceHistoryData || undefined,

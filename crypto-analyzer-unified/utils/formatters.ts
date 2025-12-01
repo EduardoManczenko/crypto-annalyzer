@@ -17,6 +17,23 @@ export function formatLargeNumber(num: number | null | undefined): string {
   return num.toLocaleString('en-US');
 }
 
+/**
+ * SAFE toFixed - Garante que o valor é número antes de chamar .toFixed()
+ * Previne "e.toFixed is not a function" errors
+ */
+export function safeToFixed(value: any, decimals: number = 2): string {
+  // Validar se é null/undefined
+  if (value === null || value === undefined) return 'N/A';
+
+  // Converter para número
+  const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+
+  // Validar se é número válido
+  if (isNaN(num) || !isFinite(num)) return 'N/A';
+
+  return num.toFixed(decimals);
+}
+
 export function getMarketCapCategory(mcap: number | null | undefined): {
   category: string;
   risk: string;
