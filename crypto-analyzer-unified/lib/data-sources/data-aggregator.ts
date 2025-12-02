@@ -209,52 +209,99 @@ export async function aggregateData(
       if (chainMapping && chainMapping.defillama) {
         console.log(`[Aggregator] 🚀 Usando BUSCA EXATA com nome DeFiLlama: ${chainMapping.defillama}`)
         console.log(`[Aggregator] 🎯 Buscando CoinGecko por ID direto: ${chainMapping.coingecko}`)
-        ;[defiChain, coinData] = await Promise.race([
-          Promise.all([
+        try {
+          ;[defiChain, coinData] = await Promise.race([
+            Promise.all([
+              searchChainByExactName(chainMapping.defillama),
+              chainMapping.coingecko ? fetchCoinById(chainMapping.coingecko) : searchCoin(query)
+            ]),
+            new Promise<[null, null]>((_, reject) =>
+              setTimeout(() => reject(new Error('Timeout global')), 25000)
+            )
+          ])
+        } catch (timeoutError) {
+          console.log('[Aggregator] ⚠️ Timeout detectado, tentando busca individual...')
+          // Se timeout, tenta buscar individualmente com timeouts menores
+          const [chainResult, coinResult] = await Promise.allSettled([
             searchChainByExactName(chainMapping.defillama),
             chainMapping.coingecko ? fetchCoinById(chainMapping.coingecko) : searchCoin(query)
-          ]),
-          new Promise<[null, null]>((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout global')), 25000)
-          )
-        ])
+          ])
+          defiChain = chainResult.status === 'fulfilled' ? chainResult.value : null
+          coinData = coinResult.status === 'fulfilled' ? coinResult.value : null
+          console.log('[Aggregator] Resultados após timeout:', { defiChain: !!defiChain, coinData: !!coinData })
+        }
       } else {
         // Fallback: busca normal
-        ;[defiChain, coinData] = await Promise.race([
-          Promise.all([
+        try {
+          ;[defiChain, coinData] = await Promise.race([
+            Promise.all([
+              searchChain(query),
+              searchCoin(query)
+            ]),
+            new Promise<[null, null]>((_, reject) =>
+              setTimeout(() => reject(new Error('Timeout global')), 25000)
+            )
+          ])
+        } catch (timeoutError) {
+          console.log('[Aggregator] ⚠️ Timeout detectado na busca normal, tentando busca individual...')
+          const [chainResult, coinResult] = await Promise.allSettled([
             searchChain(query),
+            searchCoin(query)
+          ])
+          defiChain = chainResult.status === 'fulfilled' ? chainResult.value : null
+          coinData = coinResult.status === 'fulfilled' ? coinResult.value : null
+          console.log('[Aggregator] Resultados após timeout:', { defiChain: !!defiChain, coinData: !!coinData })
+        }
+      }
+    } else if (explicitType === 'protocol') {
+      // Se usuário selecionou PROTOCOL explicitamente, IGNORAR chains completamente
+      console.log('[Aggregator] 🎯 Busca RESTRITA a PROTOCOLS (ignorando chains)')
+      try {
+        ;[defiProtocol, coinData] = await Promise.race([
+          Promise.all([
+            searchProtocol(query),
             searchCoin(query)
           ]),
           new Promise<[null, null]>((_, reject) =>
             setTimeout(() => reject(new Error('Timeout global')), 25000)
           )
         ])
-      }
-    } else if (explicitType === 'protocol') {
-      // Se usuário selecionou PROTOCOL explicitamente, IGNORAR chains completamente
-      console.log('[Aggregator] 🎯 Busca RESTRITA a PROTOCOLS (ignorando chains)')
-      ;[defiProtocol, coinData] = await Promise.race([
-        Promise.all([
+      } catch (timeoutError) {
+        console.log('[Aggregator] ⚠️ Timeout detectado na busca de protocol, tentando busca individual...')
+        const [protocolResult, coinResult] = await Promise.allSettled([
           searchProtocol(query),
           searchCoin(query)
-        ]),
-        new Promise<[null, null]>((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout global')), 25000)
-        )
-      ])
+        ])
+        defiProtocol = protocolResult.status === 'fulfilled' ? protocolResult.value : null
+        coinData = coinResult.status === 'fulfilled' ? coinResult.value : null
+        console.log('[Aggregator] Resultados após timeout:', { defiProtocol: !!defiProtocol, coinData: !!coinData })
+      }
     } else {
       // Busca normal: todas as fontes
       console.log('[Aggregator] 🔍 Busca AMPLA (todas as fontes)')
-      ;[defiProtocol, defiChain, coinData] = await Promise.race([
-        Promise.all([
+      try {
+        ;[defiProtocol, defiChain, coinData] = await Promise.race([
+          Promise.all([
+            searchProtocol(query),
+            searchChain(query),
+            searchCoin(query)
+          ]),
+          new Promise<[null, null, null]>((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout global')), 25000)
+          )
+        ])
+      } catch (timeoutError) {
+        console.log('[Aggregator] ⚠️ Timeout detectado na busca ampla, tentando busca individual...')
+        const [protocolResult, chainResult, coinResult] = await Promise.allSettled([
           searchProtocol(query),
           searchChain(query),
           searchCoin(query)
-        ]),
-        new Promise<[null, null, null]>((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout global')), 25000)
-        )
-      ])
+        ])
+        defiProtocol = protocolResult.status === 'fulfilled' ? protocolResult.value : null
+        defiChain = chainResult.status === 'fulfilled' ? chainResult.value : null
+        coinData = coinResult.status === 'fulfilled' ? coinResult.value : null
+        console.log('[Aggregator] Resultados após timeout:', { defiProtocol: !!defiProtocol, defiChain: !!defiChain, coinData: !!coinData })
+      }
     }
 
     console.log('[Aggregator] Resultados iniciais:', {
