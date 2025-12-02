@@ -6,6 +6,7 @@
 import { fuzzySearch } from './fuzzy-search';
 import { httpGet } from './data-sources/http-client';
 import { isChain, isProtocol } from './data-sources/asset-identifier';
+import { findChainMapping } from './data-sources/chain-mappings';
 
 export interface IndexedItem {
   id: string
@@ -38,23 +39,30 @@ async function indexDeFiLlamaProtocols(): Promise<IndexedItem[]> {
 
     console.log(`[Indexer] ✓ ${protocols.length} protocolos encontrados no DeFiLlama`)
 
-    return protocols.map((p: any) => ({
-      id: p.slug || p.name.toLowerCase().replace(/\s+/g, '-'),
-      name: p.name,
-      symbol: p.symbol,
-      type: 'protocol' as const,
-      source: 'defillama' as const,
-      logo: p.logo,
-      tvl: p.tvl,
-      chains: p.chains || [],
-      category: p.category,
-      slug: p.slug,
-      aliases: [
-        p.name.toLowerCase(),
-        p.symbol?.toLowerCase(),
-        ...(p.chains || []).map((c: string) => `${p.name} ${c}`.toLowerCase())
-      ].filter(Boolean)
-    }))
+    return protocols
+      .filter((p: any) => {
+        // Não incluir "protocolos" que são na verdade chains conhecidas
+        // Exemplo: DeFiLlama tem um "protocol" chamado "Solana" que são todos os protocolos da chain
+        const chainMapping = findChainMapping(p.name) || findChainMapping(p.symbol)
+        return !chainMapping  // Só incluir se NÃO for uma chain conhecida
+      })
+      .map((p: any) => ({
+        id: p.slug || p.name.toLowerCase().replace(/\s+/g, '-'),
+        name: p.name,
+        symbol: p.symbol,
+        type: 'protocol' as const,
+        source: 'defillama' as const,
+        logo: p.logo,
+        tvl: p.tvl,
+        chains: p.chains || [],
+        category: p.category,
+        slug: p.slug,
+        aliases: [
+          p.name.toLowerCase(),
+          p.symbol?.toLowerCase(),
+          ...(p.chains || []).map((c: string) => `${p.name} ${c}`.toLowerCase())
+        ].filter(Boolean)
+      }))
   } catch (error: any) {
     console.error('[Indexer] Erro ao buscar DeFiLlama:', error.message)
     return []
@@ -110,8 +118,11 @@ async function indexCoinGeckoTokens(): Promise<IndexedItem[]> {
         )
 
         const tokens = data.map((t: any) => {
-          // Verificar se é realmente uma chain
-          const itemType = isChain(t.id) || isChain(t.name) ? 'chain' :
+          // Usar mapeamento de chains para identificação precisa
+          const chainMapping = findChainMapping(t.id) || findChainMapping(t.name) || findChainMapping(t.symbol)
+
+          // Se encontrou no mapeamento de chains, é definitivamente uma chain
+          const itemType = chainMapping ? 'chain' :
                           isProtocol(t.id) || isProtocol(t.name) ? 'protocol' :
                           'token'
 

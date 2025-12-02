@@ -40,6 +40,12 @@ import {
   normalizeChainName
 } from './asset-identifier'
 
+import {
+  findChainMapping,
+  isKnownChain as isKnownChainMapping,
+  getCoinGeckoChainId
+} from './chain-mappings'
+
 export interface AggregatedData {
   // Informações básicas
   name: string
@@ -166,7 +172,7 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
     console.log(`[Aggregator] Tipo de ativo identificado: ${assetType}`)
 
     // FASE 1: Buscar em TODAS as fontes em paralelo (com priorização)
-    const [defiProtocol, defiChain, coinData] = await Promise.race([
+    let [defiProtocol, defiChain, coinData] = await Promise.race([
       Promise.all([
         searchProtocol(query),
         searchChain(query),
@@ -228,11 +234,32 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
       return null
     }
 
-    // FASE 2: Determinar tipo de ativo e prioridade
+    // FASE 2: Determinar tipo de ativo usando mapeamento de chains
+    const chainMapping = findChainMapping(query)
+    const isDefinitelyChain = chainMapping !== null
+
     let primarySource: 'protocol' | 'chain' | 'coin' = 'coin'
     let defiData: DefiLlamaProtocolDetails | DefiLlamaChain | null = null
 
-    if (defiProtocol) {
+    // Se for chain conhecida do mapeamento, priorizar chain SEMPRE
+    if (isDefinitelyChain && defiChain) {
+      primarySource = 'chain'
+      defiData = defiChain
+      console.log(`[Aggregator] ✓ Chain conhecida detectada: ${chainMapping.names[0]} (${chainMapping.category})`)
+
+      // Se não encontrou no CoinGecko ainda, tentar buscar com o ID do mapeamento
+      if (!coinData && chainMapping.coingecko) {
+        console.log(`[Aggregator] Buscando no CoinGecko com ID mapeado: ${chainMapping.coingecko}`)
+        try {
+          coinData = await searchCoin(chainMapping.coingecko)
+          if (coinData) {
+            console.log('[Aggregator] ✓ Dados do CoinGecko obtidos via mapeamento')
+          }
+        } catch (error) {
+          console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko via mapeamento')
+        }
+      }
+    } else if (defiProtocol) {
       primarySource = 'protocol'
       defiData = defiProtocol
       console.log('[Aggregator] Fonte primária: DeFi Protocol')
@@ -244,6 +271,12 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
       primarySource = 'coin'
       console.log('[Aggregator] Fonte primária: CoinGecko')
     }
+
+    console.log('[Aggregator] Dados disponíveis após fase 2:', {
+      coinGecko: !!coinData,
+      defiLlama: !!defiData,
+      chainMapping: !!chainMapping
+    })
 
     // FASE 3: Buscar histórico de preços se temos CoinGecko
     let priceHistory: ChartData | null = null
@@ -263,29 +296,79 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
       }
     }
 
-    // FASE 4: Extrair TVL (com validação por scraping se necessário)
+    // FASE 4: Extrair TVL (PRIORIZANDO SCRAPING para chains e protocolos importantes)
     let tvl: number | null = null
     let tvlChange = { '1d': null, '7d': null, '30d': null, '365d': null } as AggregatedData['tvlChange']
     let chains: Record<string, number> | null = null
 
-    if (primarySource === 'protocol' && defiProtocol) {
-      tvl = extractLatestTVL(defiProtocol)
-      tvlChange = calculateTVLChanges(defiProtocol)
-      chains = extractChainTvls(defiProtocol)
+    // Lista de assets importantes que SEMPRE devem usar scraping primeiro
+    const PRIORITY_SCRAPING = [
+      'solana', 'sol', 'ethereum', 'eth', 'bitcoin', 'btc',
+      'binance', 'bnb', 'avalanche', 'avax', 'polygon', 'matic',
+      'arbitrum', 'optimism', 'base', 'blast'
+    ];
+    const shouldPrioritizeScraping = PRIORITY_SCRAPING.some(term =>
+      query.toLowerCase().includes(term)
+    );
 
-      // VALIDAÇÃO: Se TVL parece baixo, tentar scraping para confirmar
-      if (tvl && tvl < 1000000) {
-        console.log('[Aggregator] TVL parece baixo, validando com scraping...')
+    if (primarySource === 'protocol' && defiProtocol) {
+      // PRIORIZAR SCRAPING para assets importantes
+      if (shouldPrioritizeScraping) {
+        console.log('[Aggregator] Asset prioritário detectado - tentando scraping PRIMEIRO...')
         const scrapedData = await scrapeProtocolPage(defiProtocol.slug)
 
-        if (scrapedData && scrapedData.tvl && scrapedData.tvl > tvl) {
-          console.log(`[Aggregator] ✓ Scraping retornou TVL maior: $${(scrapedData.tvl / 1e9).toFixed(3)}B vs $${(tvl / 1e9).toFixed(3)}B`)
+        if (scrapedData && scrapedData.tvl) {
+          console.log(`[Aggregator] ✓ TVL obtido via scraping prioritário: $${(scrapedData.tvl / 1e9).toFixed(3)}B`)
           tvl = scrapedData.tvl
-          chains = scrapedData.chains || chains
+          tvlChange = {
+            '1d': scrapedData.tvlChange24h,
+            '7d': scrapedData.tvlChange7d,
+            '30d': scrapedData.tvlChange30d,
+            '365d': null
+          }
+          chains = scrapedData.chains || null
+        }
+      }
+
+      // Se scraping não funcionou ou não foi tentado, usar API
+      if (!tvl) {
+        tvl = extractLatestTVL(defiProtocol)
+        tvlChange = calculateTVLChanges(defiProtocol)
+        chains = extractChainTvls(defiProtocol)
+
+        // VALIDAÇÃO: Se TVL parece baixo ou suspeito, tentar scraping para confirmar
+        if (tvl && tvl < 1000000) {
+          console.log('[Aggregator] TVL parece baixo, validando com scraping...')
+          const scrapedData = await scrapeProtocolPage(defiProtocol.slug)
+
+          if (scrapedData && scrapedData.tvl && scrapedData.tvl > tvl) {
+            console.log(`[Aggregator] ✓ Scraping retornou TVL maior: $${(scrapedData.tvl / 1e9).toFixed(3)}B vs $${(tvl / 1e9).toFixed(3)}B`)
+            tvl = scrapedData.tvl
+            chains = scrapedData.chains || chains
+          }
         }
       }
     } else if (primarySource === 'chain' && defiChain) {
-      tvl = defiChain.tvl || null
+      // Para chains, SEMPRE priorizar scraping (chains geralmente têm dados mais precisos no site)
+      console.log('[Aggregator] Chain detectada - tentando scraping PRIMEIRO...')
+      const scrapedData = await scrapeChainPage(defiChain.name)
+
+      if (scrapedData && scrapedData.tvl) {
+        console.log(`[Aggregator] ✓ TVL da chain obtido via scraping: $${(scrapedData.tvl / 1e9).toFixed(3)}B`)
+        tvl = scrapedData.tvl
+        tvlChange = {
+          '1d': scrapedData.tvlChange24h,
+          '7d': scrapedData.tvlChange7d,
+          '30d': scrapedData.tvlChange30d,
+          '365d': null
+        }
+      }
+
+      // Fallback para API se scraping falhar
+      if (!tvl) {
+        tvl = defiChain.tvl || null
+        console.log(`[Aggregator] ✓ TVL da chain da API: $${tvl ? (tvl / 1e9).toFixed(3) + 'B' : 'null'}`)
+      }
     }
 
     // FASE 5: Consolidar dados

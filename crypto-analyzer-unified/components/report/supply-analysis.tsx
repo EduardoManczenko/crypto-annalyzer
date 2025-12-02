@@ -4,7 +4,7 @@ import { InfoIcon } from "../info-icon"
 import { LabelWithTooltip } from "../label-with-tooltip"
 import { DataValue } from "../data-value"
 import { CryptoData } from "@/types"
-import { formatLargeNumber } from "@/utils/formatters"
+import { formatLargeNumber, formatMaxSupply, hasInfiniteSupply } from "@/utils/formatters"
 import { sectionTooltips, fieldTooltips, getSourceColor } from "@/lib/tooltips"
 
 interface SupplyAnalysisProps {
@@ -12,6 +12,9 @@ interface SupplyAnalysisProps {
 }
 
 export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
+  // Verificar se o token tem supply infinito por natureza
+  const isInfiniteSupply = hasInfiniteSupply(data.symbol, data.name);
+
   const supplyData = [
     {
       type: "Circulating Supply",
@@ -20,6 +23,8 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
       percentage:
         data.circulating && data.max
           ? `${((data.circulating / data.max) * 100).toFixed(2)}%`
+          : isInfiniteSupply
+          ? "~"  // Para supply infinito, não faz sentido calcular porcentagem
           : "N/A",
     },
     {
@@ -29,13 +34,15 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
       percentage:
         data.total && data.max
           ? `${((data.total / data.max) * 100).toFixed(2)}%`
+          : isInfiniteSupply
+          ? "~"  // Para supply infinito, não faz sentido calcular porcentagem
           : "N/A",
     },
     {
       type: "Max Supply",
       tooltipKey: "maxSupply" as const,
-      quantity: formatLargeNumber(data.max),
-      percentage: data.max ? "100.00%" : "N/A",
+      quantity: formatMaxSupply(data.max, data.symbol, data.name),
+      percentage: data.max ? "100.00%" : isInfiniteSupply ? "∞" : "N/A",
     },
     {
       type: "Tokens Locked",
@@ -47,6 +54,8 @@ export function SupplyAnalysis({ data }: SupplyAnalysisProps) {
       percentage:
         data.total && data.circulating && data.max
           ? `${(((data.total - data.circulating) / data.max) * 100).toFixed(2)}%`
+          : isInfiniteSupply
+          ? "~"  // Para supply infinito, não faz sentido calcular porcentagem
           : "N/A",
     },
   ]

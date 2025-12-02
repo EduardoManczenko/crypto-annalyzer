@@ -24,7 +24,12 @@ export function TvlDistribution({ data }: TvlDistributionProps) {
     }))
     .sort((a, b) => b.tvl - a.tvl)
 
+  // Não mostrar se não há distribuição ou se há apenas 1 chain (TVL não é distribuído)
   if (distribution.length === 0) return null
+  if (distribution.length === 1) return null  // Não faz sentido mostrar "distribuição" de 1 chain
+
+  // Não mostrar se uma única chain tem >98% do TVL (praticamente não distribuído)
+  if (distribution[0]?.percentageNum > 98) return null
 
   return (
     <Card className="p-6">
