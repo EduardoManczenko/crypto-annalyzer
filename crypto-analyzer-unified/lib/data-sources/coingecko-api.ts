@@ -59,6 +59,26 @@ export interface CoinGeckoCoinData {
 }
 
 /**
+ * Busca moeda diretamente por ID do CoinGecko
+ */
+export async function fetchCoinById(coinId: string): Promise<CoinGeckoCoinData | null> {
+  try {
+    console.log(`[CoinGecko API] Buscando por ID: ${coinId}`)
+
+    const coinData = await httpGet(
+      `${API_BASE}/coins/${coinId}?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`,
+      { timeout: 15000 }
+    )
+
+    console.log(`[CoinGecko API] ✓ Dados obtidos para ${coinId}`)
+    return coinData
+  } catch (error: any) {
+    console.error(`[CoinGecko API] Erro ao buscar ${coinId}:`, error.message)
+    return null
+  }
+}
+
+/**
  * Busca moeda no CoinGecko
  */
 export async function searchCoin(query: string): Promise<CoinGeckoCoinData | null> {
@@ -77,15 +97,8 @@ export async function searchCoin(query: string): Promise<CoinGeckoCoinData | nul
     const coin = coins[0]
     console.log(`[CoinGecko API] Moeda encontrada: ${coin.name} (${coin.id})`)
 
-    // Obter detalhes
-    const coinData = await httpGet(
-      `${API_BASE}/coins/${coin.id}?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`,
-      { timeout: 15000 }
-    )
-
-    console.log(`[CoinGecko API] ✓ Dados obtidos para ${coin.id}`)
-
-    return coinData
+    // Usar fetchCoinById para obter detalhes
+    return await fetchCoinById(coin.id)
   } catch (error: any) {
     console.error('[CoinGecko API] Erro na busca:', error.message)
     return null
