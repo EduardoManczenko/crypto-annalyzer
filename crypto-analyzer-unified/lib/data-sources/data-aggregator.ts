@@ -310,22 +310,30 @@ export async function aggregateData(
     let defiData: DefiLlamaProtocolDetails | DefiLlamaChain | null = null
 
     // PRIORIDADE 1: Se tipo explícito foi fornecido, FORÇAR esse tipo
-    if (explicitType === 'chain' && defiChain) {
+    if (explicitType === 'chain') {
       primarySource = 'chain'
-      defiData = defiChain
+      defiData = defiChain // pode ser null, mas vamos usar coinData anyway
       console.log(`[Aggregator] 🎯 CHAIN EXPLÍCITA selecionada pelo usuário`)
 
-      // Tentar buscar dados do CoinGecko se não temos ainda
+      // SEMPRE tentar buscar dados do CoinGecko se temos chainMapping
       if (!coinData && chainMapping?.coingecko) {
         console.log(`[Aggregator] 🎯 Buscando no CoinGecko por ID direto: ${chainMapping.coingecko}`)
         try {
           coinData = await fetchCoinById(chainMapping.coingecko)
           if (coinData) {
             console.log('[Aggregator] ✓ Dados do CoinGecko obtidos via mapeamento')
+          } else {
+            console.log('[Aggregator] ⚠ CoinGecko retornou null para:', chainMapping.coingecko)
           }
-        } catch (error) {
-          console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko via mapeamento')
+        } catch (error: any) {
+          console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko via mapeamento:', error.message)
         }
+      }
+
+      // Se não temos defiChain mas temos coinData, ainda é válido!
+      if (!defiChain && coinData) {
+        console.log('[Aggregator] ⚠ DeFiLlama chain não encontrada, mas CoinGecko data disponível')
+        primarySource = 'coin'
       }
     } else if (explicitType === 'protocol' && defiProtocol) {
       primarySource = 'protocol'
