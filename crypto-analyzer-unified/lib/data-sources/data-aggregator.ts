@@ -40,6 +40,12 @@ import {
   normalizeChainName
 } from './asset-identifier'
 
+import {
+  findChainMapping,
+  isKnownChain as isKnownChainMapping,
+  getCoinGeckoChainId
+} from './chain-mappings'
+
 export interface AggregatedData {
   // Informações básicas
   name: string
@@ -166,7 +172,7 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
     console.log(`[Aggregator] Tipo de ativo identificado: ${assetType}`)
 
     // FASE 1: Buscar em TODAS as fontes em paralelo (com priorização)
-    const [defiProtocol, defiChain, coinData] = await Promise.race([
+    let [defiProtocol, defiChain, coinData] = await Promise.race([
       Promise.all([
         searchProtocol(query),
         searchChain(query),
@@ -228,28 +234,31 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
       return null
     }
 
-    // FASE 2: Determinar tipo de ativo e prioridade
-    // IMPORTANTE: Priorizar CHAIN sobre PROTOCOL para termos conhecidos de chains
+    // FASE 2: Determinar tipo de ativo usando mapeamento de chains
+    const chainMapping = findChainMapping(query)
+    const isDefinitelyChain = chainMapping !== null
+
     let primarySource: 'protocol' | 'chain' | 'coin' = 'coin'
     let defiData: DefiLlamaProtocolDetails | DefiLlamaChain | null = null
 
-    // Lista de chains conhecidas que devem SEMPRE ter prioridade sobre protocolos
-    const KNOWN_CHAINS = [
-      'stellar', 'xlm', 'solana', 'sol', 'ethereum', 'eth',
-      'bitcoin', 'btc', 'binance', 'bnb', 'avalanche', 'avax',
-      'polygon', 'matic', 'arbitrum', 'optimism', 'base',
-      'near', 'cosmos', 'atom', 'polkadot', 'dot', 'cardano', 'ada',
-      'sui', 'aptos', 'apt', 'ton', 'tron', 'trx'
-    ];
-    const isKnownChain = KNOWN_CHAINS.some(chain =>
-      query.toLowerCase().includes(chain) || assetType === 'chain'
-    );
-
-    // Priorizar chain se for um nome conhecido de chain E se encontrou dados de chain
-    if (isKnownChain && defiChain) {
+    // Se for chain conhecida do mapeamento, priorizar chain SEMPRE
+    if (isDefinitelyChain && defiChain) {
       primarySource = 'chain'
       defiData = defiChain
-      console.log('[Aggregator] Fonte primária: DeFi Chain (priorizada por nome conhecido)')
+      console.log(`[Aggregator] ✓ Chain conhecida detectada: ${chainMapping.names[0]} (${chainMapping.category})`)
+
+      // Se não encontrou no CoinGecko ainda, tentar buscar com o ID do mapeamento
+      if (!coinData && chainMapping.coingecko) {
+        console.log(`[Aggregator] Buscando no CoinGecko com ID mapeado: ${chainMapping.coingecko}`)
+        try {
+          coinData = await searchCoin(chainMapping.coingecko)
+          if (coinData) {
+            console.log('[Aggregator] ✓ Dados do CoinGecko obtidos via mapeamento')
+          }
+        } catch (error) {
+          console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko via mapeamento')
+        }
+      }
     } else if (defiProtocol) {
       primarySource = 'protocol'
       defiData = defiProtocol
@@ -262,6 +271,12 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
       primarySource = 'coin'
       console.log('[Aggregator] Fonte primária: CoinGecko')
     }
+
+    console.log('[Aggregator] Dados disponíveis após fase 2:', {
+      coinGecko: !!coinData,
+      defiLlama: !!defiData,
+      chainMapping: !!chainMapping
+    })
 
     // FASE 3: Buscar histórico de preços se temos CoinGecko
     let priceHistory: ChartData | null = null
