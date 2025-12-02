@@ -544,21 +544,43 @@ export async function aggregateData(
       console.log('[Aggregator] Chain detectada - tentando scraping PRIMEIRO...')
       const scrapedData = await scrapeChainPage(defiChain.name)
 
+      // IMPORTANTE: Separar lógica de TVL da lógica de TVL Change!
+      // Scraping pode retornar TVL Change mesmo sem TVL
+
+      // 1. Extrair TVL (prioridade: scraping → API)
       if (scrapedData && scrapedData.tvl) {
         console.log(`[Aggregator] ✓ TVL da chain obtido via scraping: $${(scrapedData.tvl / 1e9).toFixed(3)}B`)
         tvl = scrapedData.tvl
-        tvlChange = {
-          '1d': scrapedData.tvlChange24h,
-          '7d': scrapedData.tvlChange7d,
-          '30d': scrapedData.tvlChange30d,
-          '365d': null
-        }
-      }
-
-      // Fallback para API se scraping falhar
-      if (!tvl) {
+      } else {
+        // Fallback para API
         tvl = defiChain.tvl || null
         console.log(`[Aggregator] ✓ TVL da chain da API: $${tvl ? (tvl / 1e9).toFixed(3) + 'B' : 'null'}`)
+      }
+
+      // 2. Extrair TVL Change (SEMPRE do scraping, pois API não fornece)
+      if (scrapedData) {
+        const hasAnyChange = scrapedData.tvlChange24h !== null ||
+                            scrapedData.tvlChange7d !== null ||
+                            scrapedData.tvlChange30d !== null
+
+        if (hasAnyChange) {
+          console.log('[Aggregator] ✓ TVL Change da chain obtido via scraping:', {
+            '1d': scrapedData.tvlChange24h !== null ? `${scrapedData.tvlChange24h.toFixed(2)}%` : 'null',
+            '7d': scrapedData.tvlChange7d !== null ? `${scrapedData.tvlChange7d.toFixed(2)}%` : 'null',
+            '30d': scrapedData.tvlChange30d !== null ? `${scrapedData.tvlChange30d.toFixed(2)}%` : 'null'
+          })
+
+          tvlChange = {
+            '1d': scrapedData.tvlChange24h,
+            '7d': scrapedData.tvlChange7d,
+            '30d': scrapedData.tvlChange30d,
+            '365d': null
+          }
+        } else {
+          console.log('[Aggregator] ⚠ TVL Change não disponível no scraping')
+        }
+      } else {
+        console.log('[Aggregator] ⚠ Scraping falhou - TVL Change não disponível para chains via API')
       }
     }
 

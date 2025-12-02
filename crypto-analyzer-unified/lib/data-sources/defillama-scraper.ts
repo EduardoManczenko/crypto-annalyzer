@@ -187,47 +187,54 @@ export async function scrapeProtocolPage(slug: string): Promise<ScrapedProtocolD
  */
 export async function scrapeChainPage(chainName: string): Promise<ScrapedProtocolData | null> {
   try {
-    console.log(`[DefiLlama Scraper] Fazendo scraping da chain: ${chainName}`)
+    console.log(`[DefiLlama Scraper] 🌐 Fazendo scraping da chain: ${chainName}`)
+    console.log(`[DefiLlama Scraper] 🔗 URL: https://defillama.com/chain/${chainName}`)
 
     const url = `https://defillama.com/chain/${chainName}`
     const html = await httpGetHTML(url, { timeout: 20000 })
 
-    console.log(`[DefiLlama Scraper] HTML da chain obtido (${html.length} chars)`)
+    console.log(`[DefiLlama Scraper] ✓ HTML da chain obtido (${html.length} chars)`)
 
     // Tentar extrair dados do __NEXT_DATA__
     const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/)
 
-    if (nextDataMatch && nextDataMatch[1]) {
-      try {
-        const nextData = JSON.parse(nextDataMatch[1])
-        const pageProps = nextData?.props?.pageProps
-
-        if (pageProps) {
-          const tvl = pageProps.tvl || null
-          const change_1d = pageProps.change_1d ?? null
-          const change_7d = pageProps.change_7d ?? null
-          const change_1m = pageProps.change_1m ?? null
-
-          console.log('[DefiLlama Scraper] ✓ Dados da chain extraídos:', {
-            tvl: tvl ? `$${(tvl / 1e9).toFixed(3)}B` : 'N/A'
-          })
-
-          return {
-            tvl,
-            tvlChange24h: change_1d,
-            tvlChange7d: change_7d,
-            tvlChange30d: change_1m
-          }
-        }
-      } catch (parseError) {
-        console.error('[DefiLlama Scraper] Erro ao parsear dados da chain:', parseError)
-      }
+    if (!nextDataMatch || !nextDataMatch[1]) {
+      console.log('[DefiLlama Scraper] ⚠ __NEXT_DATA__ não encontrado no HTML')
+      return null
     }
 
-    console.log('[DefiLlama Scraper] ✗ Nenhum dado da chain extraído')
-    return null
+    try {
+      const nextData = JSON.parse(nextDataMatch[1])
+      const pageProps = nextData?.props?.pageProps
+
+      if (!pageProps) {
+        console.log('[DefiLlama Scraper] ⚠ pageProps não encontrado no __NEXT_DATA__')
+        return null
+      }
+
+      const tvl = pageProps.tvl || null
+      const change_1d = pageProps.change_1d ?? null
+      const change_7d = pageProps.change_7d ?? null
+      const change_1m = pageProps.change_1m ?? null
+
+      console.log('[DefiLlama Scraper] ✓ Dados da chain extraídos com sucesso:')
+      console.log('[DefiLlama Scraper]   - TVL:', tvl ? `$${(tvl / 1e9).toFixed(3)}B` : 'null')
+      console.log('[DefiLlama Scraper]   - TVL Change 1d:', change_1d !== null ? `${change_1d.toFixed(2)}%` : 'null')
+      console.log('[DefiLlama Scraper]   - TVL Change 7d:', change_7d !== null ? `${change_7d.toFixed(2)}%` : 'null')
+      console.log('[DefiLlama Scraper]   - TVL Change 30d:', change_1m !== null ? `${change_1m.toFixed(2)}%` : 'null')
+
+      return {
+        tvl,
+        tvlChange24h: change_1d,
+        tvlChange7d: change_7d,
+        tvlChange30d: change_1m
+      }
+    } catch (parseError: any) {
+      console.error('[DefiLlama Scraper] 💥 Erro ao parsear __NEXT_DATA__:', parseError.message)
+      return null
+    }
   } catch (error: any) {
-    console.error(`[DefiLlama Scraper] Erro ao fazer scraping da chain ${chainName}:`, error.message)
+    console.error(`[DefiLlama Scraper] 💥 Erro ao fazer scraping da chain ${chainName}:`, error.message)
     return null
   }
 }
