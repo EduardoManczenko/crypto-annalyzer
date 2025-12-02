@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Search, Clock, X } from "lucide-react"
+import { Search, Clock, X, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface SearchBoxProps {
@@ -102,39 +102,50 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
     e.preventDefault()
     if (!query.trim() || isLoading) return
 
-    performSearch(query)
+    performSearch(query, false)
   }
 
-  const performSearch = (searchQuery: string) => {
+  const handleForceRefresh = () => {
+    if (!query.trim() || isLoading) return
+    console.log('⚡ [SearchBox] FORCE REFRESH acionado!')
+    performSearch(query, true)
+  }
+
+  const performSearch = (searchQuery: string, force: boolean = false) => {
     // Add to history
     const newHistory = [searchQuery, ...history.filter((h) => h !== searchQuery)].slice(0, 10)
     setHistory(newHistory)
     localStorage.setItem("searchHistory", JSON.stringify(newHistory))
 
-    onSearch(searchQuery)
+    // Pass query with force parameter if needed
+    const queryWithForce = force ? `${searchQuery}|force` : searchQuery
+    onSearch(queryWithForce)
     setShowDropdown(false)
   }
 
   const handleHistoryClick = (item: string) => {
     setQuery(item)
-    performSearch(item)
+    performSearch(item, false)
   }
 
   const handleResultClick = (result: SearchResult) => {
     setQuery(result.name)
     // Pass both name AND type to ensure precise results
-    performSearchWithType(result.name, result.type)
+    performSearchWithType(result.name, result.type, false)
   }
 
-  const performSearchWithType = (searchQuery: string, type?: string) => {
+  const performSearchWithType = (searchQuery: string, type?: string, force: boolean = false) => {
     // Add to history
     const newHistory = [searchQuery, ...history.filter((h) => h !== searchQuery)].slice(0, 10)
     setHistory(newHistory)
     localStorage.setItem("searchHistory", JSON.stringify(newHistory))
 
-    // Pass query with type parameter if available
-    const queryWithType = type ? `${searchQuery}|${type}` : searchQuery
-    onSearch(queryWithType)
+    // Pass query with type parameter and force if needed
+    let queryWithParams = type ? `${searchQuery}|${type}` : searchQuery
+    if (force) {
+      queryWithParams += '|force'
+    }
+    onSearch(queryWithParams)
     setShowDropdown(false)
   }
 
@@ -178,7 +189,7 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
             onFocus={() => setShowDropdown(true)}
             placeholder="Search for crypto, DeFi protocol, or blockchain..."
             className={cn(
-              "w-full h-14 px-6 pr-14 rounded-xl",
+              "w-full h-14 px-6 pr-28 rounded-xl",
               "bg-card border border-border",
               "text-foreground placeholder:text-muted-foreground",
               "focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent",
@@ -187,9 +198,31 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
             )}
             disabled={isLoading}
           />
+
+          {/* Force Refresh Button (Yellow Lightning) */}
+          <button
+            type="button"
+            onClick={handleForceRefresh}
+            disabled={isLoading || !query.trim()}
+            title="Force Refresh - Ignore cache and fetch fresh data"
+            className={cn(
+              "absolute right-14 top-1/2 -translate-y-1/2",
+              "w-10 h-10 rounded-lg",
+              "bg-yellow-500 text-black",
+              "flex items-center justify-center",
+              "hover:bg-yellow-400 transition-colors",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              "group",
+            )}
+          >
+            <Zap className="w-5 h-5 group-hover:scale-110 transition-transform" />
+          </button>
+
+          {/* Search Button (Cyan/Accent) */}
           <button
             type="submit"
             disabled={isLoading || !query.trim()}
+            title="Search"
             className={cn(
               "absolute right-2 top-1/2 -translate-y-1/2",
               "w-10 h-10 rounded-lg",

@@ -32,17 +32,28 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Parse query to extract name and optional type
-    // Format: "name|type" (e.g., "Polkadot|chain" or just "Polkadot")
-    const [query, explicitType] = rawQuery.includes('|')
-      ? rawQuery.split('|')
-      : [rawQuery, undefined];
+    // Parse query to extract name, optional type, and force flag
+    // Format: "name|type|force" or "name|force" or "name|type" or just "name"
+    const parts = rawQuery.split('|');
+    const query = parts[0];
+    let explicitType: 'chain' | 'protocol' | 'token' | undefined = undefined;
+    let forceRefresh = false;
 
-    console.log(`\n[API] ========== Analisando: ${query}${explicitType ? ` (tipo: ${explicitType})` : ''} ==========`);
+    // Parse remaining parts (type and/or force)
+    for (let i = 1; i < parts.length; i++) {
+      const part = parts[i].toLowerCase();
+      if (part === 'force') {
+        forceRefresh = true;
+      } else if (['chain', 'protocol', 'token'].includes(part)) {
+        explicitType = part as 'chain' | 'protocol' | 'token';
+      }
+    }
+
+    console.log(`\n[API] ========== Analisando: ${query}${explicitType ? ` (tipo: ${explicitType})` : ''}${forceRefresh ? ' ⚡ FORCE REFRESH' : ''} ==========`);
 
     // Usar o data-aggregator que tem toda a lógica correta de extração de TVL,
-    // scraping e fallbacks - agora com tipo explícito
-    const aggregatedData = await aggregateData(query, explicitType as 'chain' | 'protocol' | 'token' | undefined);
+    // scraping e fallbacks - agora com tipo explícito e force refresh
+    const aggregatedData = await aggregateData(query, explicitType, forceRefresh);
 
     if (!aggregatedData) {
       console.log(`[API] Nenhum dado encontrado para: ${query}`);

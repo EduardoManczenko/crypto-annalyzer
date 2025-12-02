@@ -165,14 +165,19 @@ function calculateTVLChanges(
  */
 export async function aggregateData(
   query: string,
-  explicitType?: 'chain' | 'protocol' | 'token'
+  explicitType?: 'chain' | 'protocol' | 'token',
+  forceRefresh: boolean = false
 ): Promise<AggregatedData | null> {
-  console.log(`\n[Aggregator] ========== Agregando dados para: ${query}${explicitType ? ` (tipo: ${explicitType})` : ''} ==========`)
+  console.log(`\n[Aggregator] ========== Agregando dados para: ${query}${explicitType ? ` (tipo: ${explicitType})` : ''}${forceRefresh ? ' ⚡ FORCE REFRESH' : ''} ==========`)
 
   try {
     // FASE 0: Identificar tipo de ativo
     const assetType = explicitType || identifyAssetType(query)
     console.log(`[Aggregator] Tipo de ativo ${explicitType ? 'EXPLÍCITO' : 'identificado'}: ${assetType}`)
+
+    if (forceRefresh) {
+      console.log('[Aggregator] ⚡ FORCE REFRESH ativado - buscando dados frescos, ignorando qualquer cache')
+    }
 
     // FASE 1: Buscar em TODAS as fontes em paralelo (com priorização)
     // IMPORTANTE: Se tipo explícito foi fornecido, só buscamos nas fontes relevantes
