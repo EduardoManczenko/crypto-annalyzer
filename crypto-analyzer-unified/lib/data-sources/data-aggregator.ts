@@ -368,18 +368,26 @@ export async function aggregateData(
       defiData = defiChain // pode ser null, mas vamos usar coinData anyway
       console.log(`[Aggregator] 🎯 CHAIN EXPLÍCITA selecionada pelo usuário`)
 
-      // SEMPRE tentar buscar dados do CoinGecko se temos chainMapping
-      if (!coinData && chainMapping?.coingecko) {
-        console.log(`[Aggregator] 🎯 Buscando no CoinGecko por ID direto: ${chainMapping.coingecko}`)
-        try {
-          coinData = await fetchCoinById(chainMapping.coingecko)
-          if (coinData) {
-            console.log('[Aggregator] ✓ Dados do CoinGecko obtidos via mapeamento')
-          } else {
-            console.log('[Aggregator] ⚠ CoinGecko retornou null para:', chainMapping.coingecko)
+      // SEMPRE tentar buscar dados do CoinGecko se não tivermos ainda
+      if (!coinData) {
+        // PRIORIDADE 1: Usar gecko_id do DeFiLlama se disponível
+        const geckoIdFromDefillama = defiChain?.gecko_id
+        // PRIORIDADE 2: Usar chainMapping.coingecko
+        const geckoIdFromMapping = chainMapping?.coingecko
+        const geckoIdToUse = geckoIdFromDefillama || geckoIdFromMapping
+
+        if (geckoIdToUse) {
+          console.log(`[Aggregator] 🎯 Buscando no CoinGecko por ID: ${geckoIdToUse}${geckoIdFromDefillama ? ' (do DeFiLlama)' : ' (do mapeamento)'}`)
+          try {
+            coinData = await fetchCoinById(geckoIdToUse)
+            if (coinData) {
+              console.log('[Aggregator] ✓ Dados do CoinGecko obtidos com sucesso')
+            } else {
+              console.log('[Aggregator] ⚠ CoinGecko retornou null para:', geckoIdToUse)
+            }
+          } catch (error: any) {
+            console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko:', error.message)
           }
-        } catch (error: any) {
-          console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko via mapeamento:', error.message)
         }
       }
 
@@ -399,16 +407,24 @@ export async function aggregateData(
       defiData = defiChain
       console.log(`[Aggregator] ✓ Chain conhecida detectada: ${chainMapping?.names[0]} (${chainMapping?.category})`)
 
-      // Se não encontrou no CoinGecko ainda, tentar buscar com o ID do mapeamento
-      if (!coinData && chainMapping?.coingecko) {
-        console.log(`[Aggregator] 🎯 Buscando no CoinGecko por ID direto: ${chainMapping.coingecko}`)
-        try {
-          coinData = await fetchCoinById(chainMapping.coingecko)
-          if (coinData) {
-            console.log('[Aggregator] ✓ Dados do CoinGecko obtidos via mapeamento')
+      // Se não encontrou no CoinGecko ainda, tentar buscar
+      if (!coinData) {
+        // PRIORIDADE 1: Usar gecko_id do DeFiLlama se disponível
+        const geckoIdFromDefillama = defiChain?.gecko_id
+        // PRIORIDADE 2: Usar chainMapping.coingecko
+        const geckoIdFromMapping = chainMapping?.coingecko
+        const geckoIdToUse = geckoIdFromDefillama || geckoIdFromMapping
+
+        if (geckoIdToUse) {
+          console.log(`[Aggregator] 🎯 Buscando no CoinGecko por ID: ${geckoIdToUse}${geckoIdFromDefillama ? ' (do DeFiLlama)' : ' (do mapeamento)'}`)
+          try {
+            coinData = await fetchCoinById(geckoIdToUse)
+            if (coinData) {
+              console.log('[Aggregator] ✓ Dados do CoinGecko obtidos com sucesso')
+            }
+          } catch (error) {
+            console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko')
           }
-        } catch (error) {
-          console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko via mapeamento')
         }
       }
     }
@@ -421,6 +437,19 @@ export async function aggregateData(
       primarySource = 'chain'
       defiData = defiChain
       console.log('[Aggregator] Fonte primária: DeFi Chain')
+
+      // Tentar buscar dados do CoinGecko usando gecko_id do DeFiLlama
+      if (!coinData && defiChain.gecko_id) {
+        console.log(`[Aggregator] 🎯 Buscando no CoinGecko usando gecko_id do DeFiLlama: ${defiChain.gecko_id}`)
+        try {
+          coinData = await fetchCoinById(defiChain.gecko_id)
+          if (coinData) {
+            console.log('[Aggregator] ✓ Dados do CoinGecko obtidos usando gecko_id do DeFiLlama')
+          }
+        } catch (error) {
+          console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko usando gecko_id')
+        }
+      }
     } else {
       primarySource = 'coin'
       console.log('[Aggregator] Fonte primária: CoinGecko')
