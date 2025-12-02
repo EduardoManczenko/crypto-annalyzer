@@ -7,6 +7,7 @@
 import {
   searchProtocol,
   searchChain,
+  searchChainByExactName,
   extractLatestTVL,
   extractChainTvls,
   getProtocolUrl,
@@ -25,6 +26,7 @@ import {
 
 import {
   searchCoin,
+  fetchCoinById,
   fetchPriceHistory,
   extractCoinId,
   getCoinUrl,
@@ -179,6 +181,20 @@ export async function aggregateData(
       console.log('[Aggregator] ⚡ FORCE REFRESH ativado - buscando dados frescos, ignorando qualquer cache')
     }
 
+    // FASE 0.5: Verificar se temos chainMapping (para busca EXATA)
+    const chainMapping = findChainMapping(query)
+
+    // CORREÇÃO: Se temos chainMapping, SEMPRE tratar como chain (mesmo se explicitType vier errado do search index)
+    if (chainMapping && (!explicitType || explicitType === 'token')) {
+      console.log(`[Aggregator] 🎯 CORREÇÃO: "${query}" tem chainMapping mas tipo era "${explicitType || 'none'}", forçando tipo 'chain'`)
+      explicitType = 'chain'
+    }
+
+    if (chainMapping && explicitType === 'chain') {
+      console.log(`[Aggregator] 🎯🎯 CHAIN MAPPING ENCONTRADO + TIPO EXPLÍCITO = Busca EXATA`)
+      console.log(`[Aggregator] Usando nome DeFiLlama: "${chainMapping.defillama}"`)
+    }
+
     // FASE 1: Buscar em TODAS as fontes em paralelo (com priorização)
     // IMPORTANTE: Se tipo explícito foi fornecido, só buscamos nas fontes relevantes
     let defiProtocol: DefiLlamaProtocolDetails | null = null
@@ -188,15 +204,32 @@ export async function aggregateData(
     if (explicitType === 'chain') {
       // Se usuário selecionou CHAIN explicitamente, IGNORAR protocolos completamente
       console.log('[Aggregator] 🎯 Busca RESTRITA a CHAINS (ignorando protocolos)')
-      ;[defiChain, coinData] = await Promise.race([
-        Promise.all([
-          searchChain(query),
-          searchCoin(query)
-        ]),
-        new Promise<[null, null]>((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout global')), 25000)
-        )
-      ])
+
+      // Se temos chainMapping, usar busca EXATA pelo nome do DeFiLlama
+      if (chainMapping && chainMapping.defillama) {
+        console.log(`[Aggregator] 🚀 Usando BUSCA EXATA com nome DeFiLlama: ${chainMapping.defillama}`)
+        console.log(`[Aggregator] 🎯 Buscando CoinGecko por ID direto: ${chainMapping.coingecko}`)
+        ;[defiChain, coinData] = await Promise.race([
+          Promise.all([
+            searchChainByExactName(chainMapping.defillama),
+            chainMapping.coingecko ? fetchCoinById(chainMapping.coingecko) : searchCoin(query)
+          ]),
+          new Promise<[null, null]>((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout global')), 25000)
+          )
+        ])
+      } else {
+        // Fallback: busca normal
+        ;[defiChain, coinData] = await Promise.race([
+          Promise.all([
+            searchChain(query),
+            searchCoin(query)
+          ]),
+          new Promise<[null, null]>((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout global')), 25000)
+          )
+        ])
+      }
     } else if (explicitType === 'protocol') {
       // Se usuário selecionou PROTOCOL explicitamente, IGNORAR chains completamente
       console.log('[Aggregator] 🎯 Busca RESTRITA a PROTOCOLS (ignorando chains)')
@@ -276,29 +309,37 @@ export async function aggregateData(
     }
 
     // FASE 2: Determinar tipo de ativo usando mapeamento de chains e tipo explícito
-    const chainMapping = findChainMapping(query)
+    // chainMapping já foi obtido na FASE 0.5
     const isDefinitelyChain = chainMapping !== null || explicitType === 'chain'
 
     let primarySource: 'protocol' | 'chain' | 'coin' = 'coin'
     let defiData: DefiLlamaProtocolDetails | DefiLlamaChain | null = null
 
     // PRIORIDADE 1: Se tipo explícito foi fornecido, FORÇAR esse tipo
-    if (explicitType === 'chain' && defiChain) {
+    if (explicitType === 'chain') {
       primarySource = 'chain'
-      defiData = defiChain
+      defiData = defiChain // pode ser null, mas vamos usar coinData anyway
       console.log(`[Aggregator] 🎯 CHAIN EXPLÍCITA selecionada pelo usuário`)
 
-      // Tentar buscar dados do CoinGecko se não temos ainda
+      // SEMPRE tentar buscar dados do CoinGecko se temos chainMapping
       if (!coinData && chainMapping?.coingecko) {
-        console.log(`[Aggregator] Buscando no CoinGecko com ID mapeado: ${chainMapping.coingecko}`)
+        console.log(`[Aggregator] 🎯 Buscando no CoinGecko por ID direto: ${chainMapping.coingecko}`)
         try {
-          coinData = await searchCoin(chainMapping.coingecko)
+          coinData = await fetchCoinById(chainMapping.coingecko)
           if (coinData) {
             console.log('[Aggregator] ✓ Dados do CoinGecko obtidos via mapeamento')
+          } else {
+            console.log('[Aggregator] ⚠ CoinGecko retornou null para:', chainMapping.coingecko)
           }
-        } catch (error) {
-          console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko via mapeamento')
+        } catch (error: any) {
+          console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko via mapeamento:', error.message)
         }
+      }
+
+      // Se não temos defiChain mas temos coinData, ainda é válido!
+      if (!defiChain && coinData) {
+        console.log('[Aggregator] ⚠ DeFiLlama chain não encontrada, mas CoinGecko data disponível')
+        primarySource = 'coin'
       }
     } else if (explicitType === 'protocol' && defiProtocol) {
       primarySource = 'protocol'
@@ -313,9 +354,9 @@ export async function aggregateData(
 
       // Se não encontrou no CoinGecko ainda, tentar buscar com o ID do mapeamento
       if (!coinData && chainMapping?.coingecko) {
-        console.log(`[Aggregator] Buscando no CoinGecko com ID mapeado: ${chainMapping.coingecko}`)
+        console.log(`[Aggregator] 🎯 Buscando no CoinGecko por ID direto: ${chainMapping.coingecko}`)
         try {
-          coinData = await searchCoin(chainMapping.coingecko)
+          coinData = await fetchCoinById(chainMapping.coingecko)
           if (coinData) {
             console.log('[Aggregator] ✓ Dados do CoinGecko obtidos via mapeamento')
           }

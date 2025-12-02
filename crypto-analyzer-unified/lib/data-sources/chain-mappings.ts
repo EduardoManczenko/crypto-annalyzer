@@ -63,10 +63,10 @@ export const CHAIN_MAPPINGS: Record<string, ChainMapping> = {
     category: 'L1'
   },
   polygon: {
-    names: ['polygon', 'matic'],
+    names: ['polygon', 'matic', 'pol'],
     symbols: ['MATIC', 'POL'],
     defillama: 'Polygon',
-    coingecko: 'polygon-ecosystem-token',
+    coingecko: 'polygon-ecosystem-token', // POL (migrated from MATIC on Sept 2024)
     category: 'L1'
   },
   sui: {
@@ -155,6 +155,13 @@ export const CHAIN_MAPPINGS: Record<string, ChainMapping> = {
     symbols: ['ATOM'],
     defillama: 'CosmosHub',
     coingecko: 'cosmos',
+    category: 'L1'
+  },
+  celestia: {
+    names: ['celestia', 'tia'],
+    symbols: ['TIA'],
+    defillama: 'Celestia',
+    coingecko: 'celestia',
     category: 'L1'
   },
   osmosis: {
