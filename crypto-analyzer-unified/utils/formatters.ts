@@ -1,3 +1,6 @@
+// Import chain mappings for automatic detection
+import { findChainMapping } from '@/lib/data-sources/chain-mappings';
+
 export function formatNumber(num: number | null | undefined): string {
   if (num === null || num === undefined || isNaN(num)) return 'N/A';
   if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
@@ -18,11 +21,11 @@ export function formatLargeNumber(num: number | null | undefined): string {
 }
 
 /**
- * Lista de tokens/chains com supply infinito por natureza da blockchain
- * (supply não tem limite máximo definido)
+ * Lista ESTÁTICA de tokens/chains com supply infinito conhecidos
+ * Esta lista serve como fallback e para casos especiais (stablecoins, memecoins)
  */
 const INFINITE_SUPPLY_TOKENS = new Set([
-  // Layer 1 Blockchains com supply infinito
+  // Layer 1 Blockchains principais
   'ETH', 'ETHEREUM',
   'SOL', 'SOLANA',
   'DOGE', 'DOGECOIN',
@@ -31,17 +34,41 @@ const INFINITE_SUPPLY_TOKENS = new Set([
   'AVAX', 'AVALANCHE',
   'FTM', 'FANTOM',
   'NEAR', 'NEAR PROTOCOL',
-  'MATIC', 'POLYGON',
+  'MATIC', 'POLYGON', 'POL',
   'ONE', 'HARMONY',
   'ALGO', 'ALGORAND',
   'XTZ', 'TEZOS',
   'KSM', 'KUSAMA',
-  'EGLD', 'ELROND',
+  'EGLD', 'ELROND', 'MULTIVERSX',
   'ROSE', 'OASIS',
   'KAVA',
   'MINA',
   'FLOW',
-  // Stablecoins (supply expansível/contrátil)
+  'APT', 'APTOS',
+  'SUI',
+  'SEI',
+  'BERA', 'BERACHAIN',
+  'MOVE', 'MOVEMENT',
+  'HYPE', 'HYPERLIQUID',
+  'INJ', 'INJECTIVE',
+  'TIA', 'CELESTIA',
+  'OSMO', 'OSMOSIS',
+
+  // Layer 2s (maioria tem supply infinito ou sem cap)
+  'ARB', 'ARBITRUM',
+  'OP', 'OPTIMISM',
+  'METIS',
+  'IMX', 'IMMUTABLE',
+  'STRK', 'STARKNET',
+  'MANTA',
+  'BLAST',
+  'MODE',
+  'SCROLL',
+  'ZKSYNC',
+  'LINEA',
+  'TAIKO',
+
+  // Stablecoins (supply expansível/contrátil por design)
   'USDT', 'TETHER',
   'USDC', 'USD COIN',
   'DAI',
@@ -52,15 +79,27 @@ const INFINITE_SUPPLY_TOKENS = new Set([
   'FRAX',
   'LUSD',
   'MIM', 'MAGIC INTERNET MONEY',
-  // Outros tokens com supply sem limite máximo
+  'USDD',
+  'USDJ',
+  'USDE',
+
+  // Memecoins (geralmente supply infinito ou muito alto)
   'SHIB', 'SHIBA INU',
   'ELON', 'DOGELON MARS',
   'PEPE',
   'FLOKI',
+  'BONK',
+  'WIF', 'DOGWIFHAT',
 ]);
 
 /**
- * Verifica se um token tem supply infinito por natureza
+ * Verifica se um token/chain tem supply infinito por natureza
+ *
+ * LÓGICA:
+ * 1. Verifica se é uma chain conhecida (L1/L2) via chain-mappings
+ *    - Se for L1 ou L2 → infinite supply (a maioria das chains modernas não tem cap)
+ * 2. Verifica se está na lista estática de tokens com infinite supply
+ * 3. Caso contrário → não é infinite supply (mas pode ter max supply definido)
  */
 export function hasInfiniteSupply(symbol: string | null | undefined, name: string | null | undefined): boolean {
   if (!symbol && !name) return false;
@@ -68,6 +107,24 @@ export function hasInfiniteSupply(symbol: string | null | undefined, name: strin
   const normalizedSymbol = symbol?.toUpperCase().trim() || '';
   const normalizedName = name?.toUpperCase().trim() || '';
 
+  // 1. PRIORIDADE: Verificar se é uma chain conhecida via mappings
+  const chainMapping = findChainMapping(normalizedName.toLowerCase()) ||
+                       findChainMapping(normalizedSymbol.toLowerCase());
+
+  if (chainMapping) {
+    // Chains L1 e L2 modernas geralmente têm supply infinito ou sem cap
+    // Exceções: Bitcoin (BTC), Litecoin (LTC), Cardano (ADA) têm max supply
+    const hasMaxSupply = ['BTC', 'BITCOIN', 'LTC', 'LITECOIN', 'ADA', 'CARDANO', 'XRP', 'RIPPLE'].includes(normalizedSymbol);
+
+    if (hasMaxSupply) {
+      return false; // Estas chains TÊM max supply definido
+    }
+
+    // Todas as outras L1s e L2s geralmente têm supply infinito
+    return chainMapping.category === 'L1' || chainMapping.category === 'L2';
+  }
+
+  // 2. Verificar na lista estática (fallback para tokens, stablecoins, memecoins)
   return INFINITE_SUPPLY_TOKENS.has(normalizedSymbol) ||
          INFINITE_SUPPLY_TOKENS.has(normalizedName);
 }
