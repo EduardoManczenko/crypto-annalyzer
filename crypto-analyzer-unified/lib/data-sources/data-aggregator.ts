@@ -229,10 +229,28 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
     }
 
     // FASE 2: Determinar tipo de ativo e prioridade
+    // IMPORTANTE: Priorizar CHAIN sobre PROTOCOL para termos conhecidos de chains
     let primarySource: 'protocol' | 'chain' | 'coin' = 'coin'
     let defiData: DefiLlamaProtocolDetails | DefiLlamaChain | null = null
 
-    if (defiProtocol) {
+    // Lista de chains conhecidas que devem SEMPRE ter prioridade sobre protocolos
+    const KNOWN_CHAINS = [
+      'stellar', 'xlm', 'solana', 'sol', 'ethereum', 'eth',
+      'bitcoin', 'btc', 'binance', 'bnb', 'avalanche', 'avax',
+      'polygon', 'matic', 'arbitrum', 'optimism', 'base',
+      'near', 'cosmos', 'atom', 'polkadot', 'dot', 'cardano', 'ada',
+      'sui', 'aptos', 'apt', 'ton', 'tron', 'trx'
+    ];
+    const isKnownChain = KNOWN_CHAINS.some(chain =>
+      query.toLowerCase().includes(chain) || assetType === 'chain'
+    );
+
+    // Priorizar chain se for um nome conhecido de chain E se encontrou dados de chain
+    if (isKnownChain && defiChain) {
+      primarySource = 'chain'
+      defiData = defiChain
+      console.log('[Aggregator] Fonte primária: DeFi Chain (priorizada por nome conhecido)')
+    } else if (defiProtocol) {
       primarySource = 'protocol'
       defiData = defiProtocol
       console.log('[Aggregator] Fonte primária: DeFi Protocol')
@@ -316,20 +334,25 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
         }
       }
     } else if (primarySource === 'chain' && defiChain) {
-      // Para chains, também priorizar scraping se for importante
-      if (shouldPrioritizeScraping) {
-        console.log('[Aggregator] Chain prioritária detectada - tentando scraping PRIMEIRO...')
-        const scrapedData = await scrapeChainPage(defiChain.name)
+      // Para chains, SEMPRE priorizar scraping (chains geralmente têm dados mais precisos no site)
+      console.log('[Aggregator] Chain detectada - tentando scraping PRIMEIRO...')
+      const scrapedData = await scrapeChainPage(defiChain.name)
 
-        if (scrapedData && scrapedData.tvl) {
-          console.log(`[Aggregator] ✓ TVL da chain obtido via scraping: $${(scrapedData.tvl / 1e9).toFixed(3)}B`)
-          tvl = scrapedData.tvl
+      if (scrapedData && scrapedData.tvl) {
+        console.log(`[Aggregator] ✓ TVL da chain obtido via scraping: $${(scrapedData.tvl / 1e9).toFixed(3)}B`)
+        tvl = scrapedData.tvl
+        tvlChange = {
+          '1d': scrapedData.tvlChange24h,
+          '7d': scrapedData.tvlChange7d,
+          '30d': scrapedData.tvlChange30d,
+          '365d': null
         }
       }
 
-      // Fallback para API
+      // Fallback para API se scraping falhar
       if (!tvl) {
         tvl = defiChain.tvl || null
+        console.log(`[Aggregator] ✓ TVL da chain da API: $${tvl ? (tvl / 1e9).toFixed(3) + 'B' : 'null'}`)
       }
     }
 
