@@ -140,30 +140,48 @@ export async function searchProtocol(query: string): Promise<DefiLlamaProtocolDe
 
     const normalizedQuery = query.toLowerCase().trim()
 
-    // Buscar por match exato primeiro
-    const exactMatch = protocols.find(p =>
-      p.slug.toLowerCase() === normalizedQuery ||
-      p.name.toLowerCase() === normalizedQuery ||
+    // PRIORIDADE 1: Match EXATO com nome
+    const exactNameMatch = protocols.find(p =>
+      p.name.toLowerCase() === normalizedQuery
+    )
+
+    if (exactNameMatch) {
+      console.log(`[DefiLlama API] 🎯 Match EXATO de protocol (nome): ${exactNameMatch.name}`)
+      return await fetchProtocolDetails(exactNameMatch.slug)
+    }
+
+    // PRIORIDADE 2: Match EXATO com slug
+    const exactSlugMatch = protocols.find(p =>
+      p.slug.toLowerCase() === normalizedQuery
+    )
+
+    if (exactSlugMatch) {
+      console.log(`[DefiLlama API] 🎯 Match EXATO de protocol (slug): ${exactSlugMatch.name}`)
+      return await fetchProtocolDetails(exactSlugMatch.slug)
+    }
+
+    // PRIORIDADE 3: Match EXATO com symbol
+    const exactSymbolMatch = protocols.find(p =>
       p.symbol?.toLowerCase() === normalizedQuery
     )
 
-    if (exactMatch) {
-      console.log(`[DefiLlama API] Match exato encontrado: ${exactMatch.name}`)
-      return await fetchProtocolDetails(exactMatch.slug)
+    if (exactSymbolMatch) {
+      console.log(`[DefiLlama API] 🎯 Match EXATO de protocol (symbol): ${exactSymbolMatch.name}`)
+      return await fetchProtocolDetails(exactSymbolMatch.slug)
     }
 
-    // Buscar por contém
+    // PRIORIDADE 4: Match parcial (CUIDADO - só se nada exato foi encontrado)
     const partialMatch = protocols.find(p =>
       p.name.toLowerCase().includes(normalizedQuery) ||
       p.slug.toLowerCase().includes(normalizedQuery)
     )
 
     if (partialMatch) {
-      console.log(`[DefiLlama API] Match parcial encontrado: ${partialMatch.name}`)
+      console.log(`[DefiLlama API] ⚠️ Match PARCIAL de protocol: ${partialMatch.name} (buscando: ${query})`)
       return await fetchProtocolDetails(partialMatch.slug)
     }
 
-    console.log(`[DefiLlama API] Nenhum protocolo encontrado para: ${query}`)
+    console.log(`[DefiLlama API] ✗ Nenhum protocolo encontrado para: ${query}`)
     return null
   } catch (error: any) {
     console.error('[DefiLlama API] Erro na busca:', error.message)
@@ -172,7 +190,33 @@ export async function searchProtocol(query: string): Promise<DefiLlamaProtocolDe
 }
 
 /**
- * Busca chain por nome
+ * Busca chain por nome EXATO do DeFiLlama (sem fallback)
+ * Usado quando temos certeza do nome exato via chain-mappings
+ */
+export async function searchChainByExactName(defillamaName: string): Promise<DefiLlamaChain | null> {
+  try {
+    console.log(`[DefiLlama API] 🎯 Buscando chain por nome EXATO: ${defillamaName}`)
+    const chains = await fetchChains()
+
+    const found = chains.find(c =>
+      c.name.toLowerCase() === defillamaName.toLowerCase()
+    )
+
+    if (found) {
+      console.log(`[DefiLlama API] ✓ Chain encontrada por nome exato: ${found.name}`)
+      return found
+    }
+
+    console.log(`[DefiLlama API] ✗ Chain não encontrada por nome exato: ${defillamaName}`)
+    return null
+  } catch (error: any) {
+    console.error('[DefiLlama API] Erro ao buscar chain por nome exato:', error.message)
+    return null
+  }
+}
+
+/**
+ * Busca chain por nome - COM PRIORIZAÇÃO DE MATCH EXATO
  */
 export async function searchChain(query: string): Promise<DefiLlamaChain | null> {
   try {
@@ -180,19 +224,48 @@ export async function searchChain(query: string): Promise<DefiLlamaChain | null>
 
     const normalizedQuery = query.toLowerCase().trim()
 
-    const found = chains.find(c =>
-      c.name.toLowerCase() === normalizedQuery ||
-      c.name.toLowerCase().includes(normalizedQuery) ||
+    // PRIORIDADE 1: Match EXATO com nome
+    const exactNameMatch = chains.find(c =>
+      c.name.toLowerCase() === normalizedQuery
+    )
+
+    if (exactNameMatch) {
+      console.log(`[DefiLlama API] 🎯 Match EXATO de chain: ${exactNameMatch.name}`)
+      return exactNameMatch
+    }
+
+    // PRIORIDADE 2: Match EXATO com gecko_id
+    const exactGeckoMatch = chains.find(c =>
       c.gecko_id?.toLowerCase() === normalizedQuery
     )
 
-    if (found) {
-      console.log(`[DefiLlama API] Chain encontrada: ${found.name}`)
-    } else {
-      console.log(`[DefiLlama API] Nenhuma chain encontrada para: ${query}`)
+    if (exactGeckoMatch) {
+      console.log(`[DefiLlama API] 🎯 Match EXATO por gecko_id: ${exactGeckoMatch.name}`)
+      return exactGeckoMatch
     }
 
-    return found || null
+    // PRIORIDADE 3: Match EXATO com tokenSymbol
+    const exactSymbolMatch = chains.find(c =>
+      c.tokenSymbol?.toLowerCase() === normalizedQuery
+    )
+
+    if (exactSymbolMatch) {
+      console.log(`[DefiLlama API] 🎯 Match EXATO por symbol: ${exactSymbolMatch.name}`)
+      return exactSymbolMatch
+    }
+
+    // PRIORIDADE 4: Match parcial (CUIDADO - só se nada exato foi encontrado)
+    const partialMatch = chains.find(c =>
+      c.name.toLowerCase().includes(normalizedQuery)
+    )
+
+    if (partialMatch) {
+      console.log(`[DefiLlama API] ⚠️ Match PARCIAL de chain: ${partialMatch.name} (buscando: ${query})`)
+      return partialMatch
+    }
+
+    console.log(`[DefiLlama API] ✗ Nenhuma chain encontrada para: ${query}`)
+    return null
   } catch (error: any) {
     console.error('[DefiLlama API] Erro ao buscar chain:', error.message)
     return null

@@ -7,6 +7,7 @@
 import {
   searchProtocol,
   searchChain,
+  searchChainByExactName,
   extractLatestTVL,
   extractChainTvls,
   getProtocolUrl,
@@ -179,6 +180,14 @@ export async function aggregateData(
       console.log('[Aggregator] ⚡ FORCE REFRESH ativado - buscando dados frescos, ignorando qualquer cache')
     }
 
+    // FASE 0.5: Verificar se temos chainMapping (para busca EXATA)
+    const chainMapping = findChainMapping(query)
+
+    if (chainMapping && explicitType === 'chain') {
+      console.log(`[Aggregator] 🎯🎯 CHAIN MAPPING ENCONTRADO + TIPO EXPLÍCITO = Busca EXATA`)
+      console.log(`[Aggregator] Usando nome DeFiLlama: "${chainMapping.defillama}"`)
+    }
+
     // FASE 1: Buscar em TODAS as fontes em paralelo (com priorização)
     // IMPORTANTE: Se tipo explícito foi fornecido, só buscamos nas fontes relevantes
     let defiProtocol: DefiLlamaProtocolDetails | null = null
@@ -188,15 +197,31 @@ export async function aggregateData(
     if (explicitType === 'chain') {
       // Se usuário selecionou CHAIN explicitamente, IGNORAR protocolos completamente
       console.log('[Aggregator] 🎯 Busca RESTRITA a CHAINS (ignorando protocolos)')
-      ;[defiChain, coinData] = await Promise.race([
-        Promise.all([
-          searchChain(query),
-          searchCoin(query)
-        ]),
-        new Promise<[null, null]>((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout global')), 25000)
-        )
-      ])
+
+      // Se temos chainMapping, usar busca EXATA pelo nome do DeFiLlama
+      if (chainMapping && chainMapping.defillama) {
+        console.log(`[Aggregator] 🚀 Usando BUSCA EXATA com nome DeFiLlama: ${chainMapping.defillama}`)
+        ;[defiChain, coinData] = await Promise.race([
+          Promise.all([
+            searchChainByExactName(chainMapping.defillama),
+            searchCoin(chainMapping.coingecko || query)
+          ]),
+          new Promise<[null, null]>((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout global')), 25000)
+          )
+        ])
+      } else {
+        // Fallback: busca normal
+        ;[defiChain, coinData] = await Promise.race([
+          Promise.all([
+            searchChain(query),
+            searchCoin(query)
+          ]),
+          new Promise<[null, null]>((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout global')), 25000)
+          )
+        ])
+      }
     } else if (explicitType === 'protocol') {
       // Se usuário selecionou PROTOCOL explicitamente, IGNORAR chains completamente
       console.log('[Aggregator] 🎯 Busca RESTRITA a PROTOCOLS (ignorando chains)')
@@ -276,7 +301,7 @@ export async function aggregateData(
     }
 
     // FASE 2: Determinar tipo de ativo usando mapeamento de chains e tipo explícito
-    const chainMapping = findChainMapping(query)
+    // chainMapping já foi obtido na FASE 0.5
     const isDefinitelyChain = chainMapping !== null || explicitType === 'chain'
 
     let primarySource: 'protocol' | 'chain' | 'coin' = 'coin'
