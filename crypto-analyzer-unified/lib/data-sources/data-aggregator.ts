@@ -184,6 +184,12 @@ export async function aggregateData(
     // FASE 0.5: Verificar se temos chainMapping (para busca EXATA)
     const chainMapping = findChainMapping(query)
 
+    // CORREÇÃO: Se temos chainMapping, SEMPRE tratar como chain (mesmo se explicitType vier errado do search index)
+    if (chainMapping && (!explicitType || explicitType === 'token')) {
+      console.log(`[Aggregator] 🎯 CORREÇÃO: "${query}" tem chainMapping mas tipo era "${explicitType || 'none'}", forçando tipo 'chain'`)
+      explicitType = 'chain'
+    }
+
     if (chainMapping && explicitType === 'chain') {
       console.log(`[Aggregator] 🎯🎯 CHAIN MAPPING ENCONTRADO + TIPO EXPLÍCITO = Busca EXATA`)
       console.log(`[Aggregator] Usando nome DeFiLlama: "${chainMapping.defillama}"`)
