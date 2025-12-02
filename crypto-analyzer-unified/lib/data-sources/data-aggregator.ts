@@ -206,13 +206,15 @@ export async function aggregateData(
       console.log('[Aggregator] 🎯 Busca RESTRITA a CHAINS (ignorando protocolos)')
 
       // Se temos chainMapping, usar busca EXATA pelo nome do DeFiLlama
-      if (chainMapping && chainMapping.defillama) {
-        console.log(`[Aggregator] 🚀 Usando BUSCA EXATA com nome DeFiLlama: ${chainMapping.defillama}`)
-        console.log(`[Aggregator] 🎯 Buscando CoinGecko por ID direto: ${chainMapping.coingecko}`)
+      if (chainMapping) {
+        console.log(`[Aggregator] 🚀 Chain mapping encontrado para: ${query}`)
+        console.log(`[Aggregator] 🎯 CoinGecko ID: ${chainMapping.coingecko}`)
+        console.log(`[Aggregator] 🎯 DeFiLlama nome: ${chainMapping.defillama}`)
+
         try {
           ;[defiChain, coinData] = await Promise.race([
             Promise.all([
-              searchChainByExactName(chainMapping.defillama),
+              chainMapping.defillama ? searchChainByExactName(chainMapping.defillama) : Promise.resolve(null),
               chainMapping.coingecko ? fetchCoinById(chainMapping.coingecko) : searchCoin(query)
             ]),
             new Promise<[null, null]>((_, reject) =>
@@ -223,13 +225,19 @@ export async function aggregateData(
           console.log('[Aggregator] ⚠️ Timeout detectado, tentando busca individual...')
           // Se timeout, tenta buscar individualmente com timeouts menores
           const [chainResult, coinResult] = await Promise.allSettled([
-            searchChainByExactName(chainMapping.defillama),
+            chainMapping.defillama ? searchChainByExactName(chainMapping.defillama) : Promise.resolve(null),
             chainMapping.coingecko ? fetchCoinById(chainMapping.coingecko) : searchCoin(query)
           ])
           defiChain = chainResult.status === 'fulfilled' ? chainResult.value : null
           coinData = coinResult.status === 'fulfilled' ? coinResult.value : null
           console.log('[Aggregator] Resultados após timeout:', { defiChain: !!defiChain, coinData: !!coinData })
         }
+
+        console.log('[Aggregator] Resultados após busca com chainMapping:', {
+          defiChain: !!defiChain,
+          coinData: !!coinData,
+          coinDataName: coinData?.name || 'N/A'
+        })
       } else {
         // Fallback: busca normal
         try {
