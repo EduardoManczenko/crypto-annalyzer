@@ -26,6 +26,7 @@ import {
 
 import {
   searchCoin,
+  fetchCoinById,
   fetchPriceHistory,
   extractCoinId,
   getCoinUrl,
@@ -201,10 +202,11 @@ export async function aggregateData(
       // Se temos chainMapping, usar busca EXATA pelo nome do DeFiLlama
       if (chainMapping && chainMapping.defillama) {
         console.log(`[Aggregator] 🚀 Usando BUSCA EXATA com nome DeFiLlama: ${chainMapping.defillama}`)
+        console.log(`[Aggregator] 🎯 Buscando CoinGecko por ID direto: ${chainMapping.coingecko}`)
         ;[defiChain, coinData] = await Promise.race([
           Promise.all([
             searchChainByExactName(chainMapping.defillama),
-            searchCoin(chainMapping.coingecko || query)
+            chainMapping.coingecko ? fetchCoinById(chainMapping.coingecko) : searchCoin(query)
           ]),
           new Promise<[null, null]>((_, reject) =>
             setTimeout(() => reject(new Error('Timeout global')), 25000)
@@ -315,9 +317,9 @@ export async function aggregateData(
 
       // Tentar buscar dados do CoinGecko se não temos ainda
       if (!coinData && chainMapping?.coingecko) {
-        console.log(`[Aggregator] Buscando no CoinGecko com ID mapeado: ${chainMapping.coingecko}`)
+        console.log(`[Aggregator] 🎯 Buscando no CoinGecko por ID direto: ${chainMapping.coingecko}`)
         try {
-          coinData = await searchCoin(chainMapping.coingecko)
+          coinData = await fetchCoinById(chainMapping.coingecko)
           if (coinData) {
             console.log('[Aggregator] ✓ Dados do CoinGecko obtidos via mapeamento')
           }
@@ -338,9 +340,9 @@ export async function aggregateData(
 
       // Se não encontrou no CoinGecko ainda, tentar buscar com o ID do mapeamento
       if (!coinData && chainMapping?.coingecko) {
-        console.log(`[Aggregator] Buscando no CoinGecko com ID mapeado: ${chainMapping.coingecko}`)
+        console.log(`[Aggregator] 🎯 Buscando no CoinGecko por ID direto: ${chainMapping.coingecko}`)
         try {
-          coinData = await searchCoin(chainMapping.coingecko)
+          coinData = await fetchCoinById(chainMapping.coingecko)
           if (coinData) {
             console.log('[Aggregator] ✓ Dados do CoinGecko obtidos via mapeamento')
           }
