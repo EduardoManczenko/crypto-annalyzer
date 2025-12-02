@@ -32,6 +32,7 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [lastSearchType, setLastSearchType] = useState<string | undefined>(undefined) // Track last search type
   const inputRef = useRef<HTMLInputElement>(null)
   const searchTimeout = useRef<NodeJS.Timeout | null>(null)
 
@@ -108,7 +109,14 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
   const handleForceRefresh = () => {
     if (!query.trim() || isLoading) return
     console.log('⚡ [SearchBox] FORCE REFRESH acionado!')
-    performSearch(query, true)
+    console.log('⚡ [SearchBox] Mantendo tipo da última busca:', lastSearchType)
+
+    // Use performSearchWithType to maintain the last search type
+    if (lastSearchType) {
+      performSearchWithType(query, lastSearchType, true)
+    } else {
+      performSearch(query, true)
+    }
   }
 
   const performSearch = (searchQuery: string, force: boolean = false) => {
@@ -139,6 +147,9 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
     const newHistory = [searchQuery, ...history.filter((h) => h !== searchQuery)].slice(0, 10)
     setHistory(newHistory)
     localStorage.setItem("searchHistory", JSON.stringify(newHistory))
+
+    // Save last search type for force refresh
+    setLastSearchType(type)
 
     // Pass query with type parameter and force if needed
     let queryWithParams = type ? `${searchQuery}|${type}` : searchQuery
