@@ -263,29 +263,74 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
       }
     }
 
-    // FASE 4: Extrair TVL (com validação por scraping se necessário)
+    // FASE 4: Extrair TVL (PRIORIZANDO SCRAPING para chains e protocolos importantes)
     let tvl: number | null = null
     let tvlChange = { '1d': null, '7d': null, '30d': null, '365d': null } as AggregatedData['tvlChange']
     let chains: Record<string, number> | null = null
 
-    if (primarySource === 'protocol' && defiProtocol) {
-      tvl = extractLatestTVL(defiProtocol)
-      tvlChange = calculateTVLChanges(defiProtocol)
-      chains = extractChainTvls(defiProtocol)
+    // Lista de assets importantes que SEMPRE devem usar scraping primeiro
+    const PRIORITY_SCRAPING = [
+      'solana', 'sol', 'ethereum', 'eth', 'bitcoin', 'btc',
+      'binance', 'bnb', 'avalanche', 'avax', 'polygon', 'matic',
+      'arbitrum', 'optimism', 'base', 'blast'
+    ];
+    const shouldPrioritizeScraping = PRIORITY_SCRAPING.some(term =>
+      query.toLowerCase().includes(term)
+    );
 
-      // VALIDAÇÃO: Se TVL parece baixo, tentar scraping para confirmar
-      if (tvl && tvl < 1000000) {
-        console.log('[Aggregator] TVL parece baixo, validando com scraping...')
+    if (primarySource === 'protocol' && defiProtocol) {
+      // PRIORIZAR SCRAPING para assets importantes
+      if (shouldPrioritizeScraping) {
+        console.log('[Aggregator] Asset prioritário detectado - tentando scraping PRIMEIRO...')
         const scrapedData = await scrapeProtocolPage(defiProtocol.slug)
 
-        if (scrapedData && scrapedData.tvl && scrapedData.tvl > tvl) {
-          console.log(`[Aggregator] ✓ Scraping retornou TVL maior: $${(scrapedData.tvl / 1e9).toFixed(3)}B vs $${(tvl / 1e9).toFixed(3)}B`)
+        if (scrapedData && scrapedData.tvl) {
+          console.log(`[Aggregator] ✓ TVL obtido via scraping prioritário: $${(scrapedData.tvl / 1e9).toFixed(3)}B`)
           tvl = scrapedData.tvl
-          chains = scrapedData.chains || chains
+          tvlChange = {
+            '1d': scrapedData.tvlChange24h,
+            '7d': scrapedData.tvlChange7d,
+            '30d': scrapedData.tvlChange30d,
+            '365d': null
+          }
+          chains = scrapedData.chains || null
+        }
+      }
+
+      // Se scraping não funcionou ou não foi tentado, usar API
+      if (!tvl) {
+        tvl = extractLatestTVL(defiProtocol)
+        tvlChange = calculateTVLChanges(defiProtocol)
+        chains = extractChainTvls(defiProtocol)
+
+        // VALIDAÇÃO: Se TVL parece baixo ou suspeito, tentar scraping para confirmar
+        if (tvl && tvl < 1000000) {
+          console.log('[Aggregator] TVL parece baixo, validando com scraping...')
+          const scrapedData = await scrapeProtocolPage(defiProtocol.slug)
+
+          if (scrapedData && scrapedData.tvl && scrapedData.tvl > tvl) {
+            console.log(`[Aggregator] ✓ Scraping retornou TVL maior: $${(scrapedData.tvl / 1e9).toFixed(3)}B vs $${(tvl / 1e9).toFixed(3)}B`)
+            tvl = scrapedData.tvl
+            chains = scrapedData.chains || chains
+          }
         }
       }
     } else if (primarySource === 'chain' && defiChain) {
-      tvl = defiChain.tvl || null
+      // Para chains, também priorizar scraping se for importante
+      if (shouldPrioritizeScraping) {
+        console.log('[Aggregator] Chain prioritária detectada - tentando scraping PRIMEIRO...')
+        const scrapedData = await scrapeChainPage(defiChain.name)
+
+        if (scrapedData && scrapedData.tvl) {
+          console.log(`[Aggregator] ✓ TVL da chain obtido via scraping: $${(scrapedData.tvl / 1e9).toFixed(3)}B`)
+          tvl = scrapedData.tvl
+        }
+      }
+
+      // Fallback para API
+      if (!tvl) {
+        tvl = defiChain.tvl || null
+      }
     }
 
     // FASE 5: Consolidar dados
