@@ -163,25 +163,61 @@ function calculateTVLChanges(
 /**
  * Agrega dados de todas as fontes disponíveis
  */
-export async function aggregateData(query: string): Promise<AggregatedData | null> {
-  console.log(`\n[Aggregator] ========== Agregando dados para: ${query} ==========`)
+export async function aggregateData(
+  query: string,
+  explicitType?: 'chain' | 'protocol' | 'token'
+): Promise<AggregatedData | null> {
+  console.log(`\n[Aggregator] ========== Agregando dados para: ${query}${explicitType ? ` (tipo: ${explicitType})` : ''} ==========`)
 
   try {
     // FASE 0: Identificar tipo de ativo
-    const assetType = identifyAssetType(query)
-    console.log(`[Aggregator] Tipo de ativo identificado: ${assetType}`)
+    const assetType = explicitType || identifyAssetType(query)
+    console.log(`[Aggregator] Tipo de ativo ${explicitType ? 'EXPLÍCITO' : 'identificado'}: ${assetType}`)
 
     // FASE 1: Buscar em TODAS as fontes em paralelo (com priorização)
-    let [defiProtocol, defiChain, coinData] = await Promise.race([
-      Promise.all([
-        searchProtocol(query),
-        searchChain(query),
-        searchCoin(query)
-      ]),
-      new Promise<[null, null, null]>((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout global')), 25000)
-      )
-    ])
+    // IMPORTANTE: Se tipo explícito foi fornecido, só buscamos nas fontes relevantes
+    let defiProtocol: DefiLlamaProtocolDetails | null = null
+    let defiChain: DefiLlamaChain | null = null
+    let coinData: CoinGeckoCoinData | null = null
+
+    if (explicitType === 'chain') {
+      // Se usuário selecionou CHAIN explicitamente, IGNORAR protocolos completamente
+      console.log('[Aggregator] 🎯 Busca RESTRITA a CHAINS (ignorando protocolos)')
+      ;[defiChain, coinData] = await Promise.race([
+        Promise.all([
+          searchChain(query),
+          searchCoin(query)
+        ]),
+        new Promise<[null, null]>((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout global')), 25000)
+        )
+      ])
+    } else if (explicitType === 'protocol') {
+      // Se usuário selecionou PROTOCOL explicitamente, IGNORAR chains completamente
+      console.log('[Aggregator] 🎯 Busca RESTRITA a PROTOCOLS (ignorando chains)')
+      ;[defiProtocol, coinData] = await Promise.race([
+        Promise.all([
+          searchProtocol(query),
+          searchCoin(query)
+        ]),
+        new Promise<[null, null]>((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout global')), 25000)
+        )
+      ])
+    } else {
+      // Busca normal: todas as fontes
+      console.log('[Aggregator] 🔍 Busca AMPLA (todas as fontes)')
+      ;[defiProtocol, defiChain, coinData] = await Promise.race([
+        Promise.all([
+          searchProtocol(query),
+          searchChain(query),
+          searchCoin(query)
+        ]),
+        new Promise<[null, null, null]>((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout global')), 25000)
+        )
+      ])
+    }
 
     console.log('[Aggregator] Resultados iniciais:', {
       defiProtocol: !!defiProtocol,
@@ -234,21 +270,21 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
       return null
     }
 
-    // FASE 2: Determinar tipo de ativo usando mapeamento de chains
+    // FASE 2: Determinar tipo de ativo usando mapeamento de chains e tipo explícito
     const chainMapping = findChainMapping(query)
-    const isDefinitelyChain = chainMapping !== null
+    const isDefinitelyChain = chainMapping !== null || explicitType === 'chain'
 
     let primarySource: 'protocol' | 'chain' | 'coin' = 'coin'
     let defiData: DefiLlamaProtocolDetails | DefiLlamaChain | null = null
 
-    // Se for chain conhecida do mapeamento, priorizar chain SEMPRE
-    if (isDefinitelyChain && defiChain) {
+    // PRIORIDADE 1: Se tipo explícito foi fornecido, FORÇAR esse tipo
+    if (explicitType === 'chain' && defiChain) {
       primarySource = 'chain'
       defiData = defiChain
-      console.log(`[Aggregator] ✓ Chain conhecida detectada: ${chainMapping.names[0]} (${chainMapping.category})`)
+      console.log(`[Aggregator] 🎯 CHAIN EXPLÍCITA selecionada pelo usuário`)
 
-      // Se não encontrou no CoinGecko ainda, tentar buscar com o ID do mapeamento
-      if (!coinData && chainMapping.coingecko) {
+      // Tentar buscar dados do CoinGecko se não temos ainda
+      if (!coinData && chainMapping?.coingecko) {
         console.log(`[Aggregator] Buscando no CoinGecko com ID mapeado: ${chainMapping.coingecko}`)
         try {
           coinData = await searchCoin(chainMapping.coingecko)
@@ -259,7 +295,32 @@ export async function aggregateData(query: string): Promise<AggregatedData | nul
           console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko via mapeamento')
         }
       }
-    } else if (defiProtocol) {
+    } else if (explicitType === 'protocol' && defiProtocol) {
+      primarySource = 'protocol'
+      defiData = defiProtocol
+      console.log(`[Aggregator] 🎯 PROTOCOL EXPLÍCITO selecionado pelo usuário`)
+    }
+    // PRIORIDADE 2: Se for chain conhecida do mapeamento, priorizar chain
+    else if (isDefinitelyChain && defiChain) {
+      primarySource = 'chain'
+      defiData = defiChain
+      console.log(`[Aggregator] ✓ Chain conhecida detectada: ${chainMapping?.names[0]} (${chainMapping?.category})`)
+
+      // Se não encontrou no CoinGecko ainda, tentar buscar com o ID do mapeamento
+      if (!coinData && chainMapping?.coingecko) {
+        console.log(`[Aggregator] Buscando no CoinGecko com ID mapeado: ${chainMapping.coingecko}`)
+        try {
+          coinData = await searchCoin(chainMapping.coingecko)
+          if (coinData) {
+            console.log('[Aggregator] ✓ Dados do CoinGecko obtidos via mapeamento')
+          }
+        } catch (error) {
+          console.log('[Aggregator] ⚠ Erro ao buscar no CoinGecko via mapeamento')
+        }
+      }
+    }
+    // PRIORIDADE 3: Fallback normal
+    else if (defiProtocol) {
       primarySource = 'protocol'
       defiData = defiProtocol
       console.log('[Aggregator] Fonte primária: DeFi Protocol')

@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const query = searchParams.get('q');
+  const rawQuery = searchParams.get('q');
 
   // Headers CORS
   const headers = {
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
   };
 
-  if (!query) {
+  if (!rawQuery) {
     return NextResponse.json(
       { error: 'Query parameter "q" is required' },
       { status: 400, headers }
@@ -32,11 +32,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`\n[API] ========== Analisando: ${query} ==========`);
+    // Parse query to extract name and optional type
+    // Format: "name|type" (e.g., "Polkadot|chain" or just "Polkadot")
+    const [query, explicitType] = rawQuery.includes('|')
+      ? rawQuery.split('|')
+      : [rawQuery, undefined];
+
+    console.log(`\n[API] ========== Analisando: ${query}${explicitType ? ` (tipo: ${explicitType})` : ''} ==========`);
 
     // Usar o data-aggregator que tem toda a lógica correta de extração de TVL,
-    // scraping e fallbacks
-    const aggregatedData = await aggregateData(query);
+    // scraping e fallbacks - agora com tipo explícito
+    const aggregatedData = await aggregateData(query, explicitType as 'chain' | 'protocol' | 'token' | undefined);
 
     if (!aggregatedData) {
       console.log(`[API] Nenhum dado encontrado para: ${query}`);

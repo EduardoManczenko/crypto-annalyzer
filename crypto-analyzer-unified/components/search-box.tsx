@@ -122,7 +122,20 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
 
   const handleResultClick = (result: SearchResult) => {
     setQuery(result.name)
-    performSearch(result.name)
+    // Pass both name AND type to ensure precise results
+    performSearchWithType(result.name, result.type)
+  }
+
+  const performSearchWithType = (searchQuery: string, type?: string) => {
+    // Add to history
+    const newHistory = [searchQuery, ...history.filter((h) => h !== searchQuery)].slice(0, 10)
+    setHistory(newHistory)
+    localStorage.setItem("searchHistory", JSON.stringify(newHistory))
+
+    // Pass query with type parameter if available
+    const queryWithType = type ? `${searchQuery}|${type}` : searchQuery
+    onSearch(queryWithType)
+    setShowDropdown(false)
   }
 
   const clearHistory = () => {
