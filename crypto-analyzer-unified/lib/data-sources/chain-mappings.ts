@@ -157,6 +157,13 @@ export const CHAIN_MAPPINGS: Record<string, ChainMapping> = {
     coingecko: 'cosmos',
     category: 'L1'
   },
+  celestia: {
+    names: ['celestia', 'tia'],
+    symbols: ['TIA'],
+    defillama: 'Celestia',
+    coingecko: 'celestia',
+    category: 'L1'
+  },
   osmosis: {
     names: ['osmosis', 'osmo'],
     symbols: ['OSMO'],
