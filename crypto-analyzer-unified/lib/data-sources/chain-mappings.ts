@@ -63,10 +63,10 @@ export const CHAIN_MAPPINGS: Record<string, ChainMapping> = {
     category: 'L1'
   },
   polygon: {
-    names: ['polygon', 'matic'],
+    names: ['polygon', 'matic', 'pol'],
     symbols: ['MATIC', 'POL'],
     defillama: 'Polygon',
-    coingecko: 'matic-network', // ID correto do MATIC no CoinGecko
+    coingecko: 'polygon-ecosystem-token', // POL (migrated from MATIC on Sept 2024)
     category: 'L1'
   },
   sui: {
