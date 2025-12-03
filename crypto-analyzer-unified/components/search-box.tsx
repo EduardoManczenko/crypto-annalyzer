@@ -189,7 +189,7 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
   }
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto">
+    <div className="relative w-[65%] mx-auto">
       <form onSubmit={handleSubmit} className="relative">
         <div className="relative">
           <input
@@ -385,23 +385,6 @@ export function SearchBox({ onSearch, isLoading }: SearchBoxProps) {
           </>
         )}
       </form>
-
-      {/* Search suggestions */}
-      <div className="mt-4 flex flex-wrap gap-2 justify-center">
-        {["Bitcoin", "Ethereum", "Solana", "Aave", "Uniswap", "Stellar"].map((suggestion) => (
-          <button
-            key={suggestion}
-            type="button"
-            onClick={() => {
-              setQuery(suggestion)
-              performSearch(suggestion)
-            }}
-            className="px-3 py-1.5 text-xs font-mono bg-muted border border-border rounded-lg hover:border-accent hover:text-accent transition-colors"
-          >
-            {suggestion}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }
